@@ -328,6 +328,16 @@ export default function Auth() {
       <div className="absolute inset-0 aurora-bg" />
       <div className="absolute inset-0 cyber-grid" />
 
+      {/* ══════ BACKGROUND DINING IMAGE ══════ */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-[0.25] dark:opacity-[0.14]">
+        <img 
+          src="/dining.png" 
+          alt="SMC Dining Background" 
+          className="w-full h-full object-cover scale-105 filter blur-[1.5px] dark:blur-[2.5px] transition-all duration-1000"
+        />
+        <div className="absolute inset-0 bg-gradient-to-tr from-background/30 via-background/10 to-background/40" />
+      </div>
+
       {/* Morphing blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/8 blob" />
@@ -370,12 +380,8 @@ export default function Auth() {
       </div>
 
       {/* ══════ MAIN CONTENT ══════ */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-4 sm:p-6 md:p-8">
-        <div className={`w-full max-w-md lg:max-w-5xl transition-all duration-1000 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            
-            {/* Left/Form Column */}
-            <div className="lg:col-span-5 flex flex-col justify-center w-full">
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
+        <div className={`w-full max-w-md transition-all duration-1000 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           
           {/* ── Logo & Title ── */}
           <div className="text-center mb-8">
@@ -676,19 +682,6 @@ export default function Auth() {
             <p className="text-[11px] text-muted-foreground/70">
               Developed by <span className="font-semibold gradient-text-hero">Al Shariear Khan Peal</span>
             </p>
-          </div>
-            </div>
-
-            {/* Right/Illustration Column */}
-            <div className="hidden lg:block lg:col-span-7 rounded-3xl overflow-hidden shadow-2xl relative border border-primary/10 self-stretch min-h-[600px] group">
-              <img 
-                src="/dining.png" 
-                alt="SMC Dining Background" 
-                className="absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-[1.03]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/20 via-transparent to-transparent pointer-events-none" />
-            </div>
-
           </div>
         </div>
       </div>
