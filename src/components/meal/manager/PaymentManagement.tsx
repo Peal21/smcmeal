@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { CreditCard, Plus, Check, Search, Download, Edit2, X, Wallet, History, Smartphone, Banknote } from 'lucide-react';
+import { CreditCard, Plus, Check, Search, Download, Edit2, X, Wallet, History, Smartphone, Banknote, Trash2 } from 'lucide-react';
 import { ChevronRight } from 'lucide-react';
 import { generatePaymentExcel } from '@/lib/paymentExcelGenerator';
 import { format } from 'date-fns';
@@ -270,6 +270,19 @@ export default function PaymentManagement() {
       toast.success('পেমেন্ট আপডেট হয়েছে');
       setEditingPaymentId(null);
       setEditAmount('');
+      if (mealMonth) await Promise.all([fetchDataForMonth(mealMonth), fetchAllPayments()]);
+    }
+  };
+
+  const deletePayment = async (paymentId: string) => {
+    const confirmDelete = window.confirm("আপনি কি নিশ্চিতভাবে এই পেমেন্টটি ডিলিট করতে চান?");
+    if (!confirmDelete) return;
+    
+    const { error } = await supabase.from('payments').delete().eq('id', paymentId);
+    if (error) {
+      toast.error('পেমেন্ট ডিলিট করতে সমস্যা হয়েছে: ' + error.message);
+    } else {
+      toast.success('পেমেন্টটি সফলভাবে ডিলিট করা হয়েছে');
       if (mealMonth) await Promise.all([fetchDataForMonth(mealMonth), fetchAllPayments()]);
     }
   };
@@ -802,14 +815,24 @@ export default function PaymentManagement() {
                                 </p>
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={() => { setEditingPaymentId(p.id); setEditAmount(String(p.amount)); setEditMethod((p.payment_method || 'cash') as 'cash' | 'bikash'); }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => { setEditingPaymentId(p.id); setEditAmount(String(p.amount)); setEditMethod((p.payment_method || 'cash') as 'cash' | 'bikash'); }}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => deletePayment(p.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </>
                         )}
                       </div>
