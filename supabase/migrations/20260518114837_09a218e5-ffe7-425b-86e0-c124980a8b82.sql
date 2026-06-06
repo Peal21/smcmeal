@@ -1,0 +1,12 @@
+ALTER TABLE public.daily_meals REPLICA IDENTITY FULL;
+ALTER TABLE public.extra_meals REPLICA IDENTITY FULL;
+ALTER TABLE public.payments REPLICA IDENTITY FULL;
+ALTER TABLE public.member_balances REPLICA IDENTITY FULL;
+ALTER TABLE public.meal_months REPLICA IDENTITY FULL;
+ALTER TABLE public.special_day_items REPLICA IDENTITY FULL;
+ALTER TABLE public.special_day_responses REPLICA IDENTITY FULL;
+ALTER TABLE public.profiles REPLICA IDENTITY FULL;
+ALTER TABLE public.app_settings REPLICA IDENTITY FULL;
+ALTER TABLE public.feast_day_config REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.app_settings;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.feast_day_config;

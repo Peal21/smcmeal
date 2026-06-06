@@ -1,0 +1,740 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import { Settings, Calculator, UserCheck, ShieldCheck, UserPlus, Send, ArrowRightCircle, CalendarDays, Save, History, Plus, Clock } from 'lucide-react';
+import { format } from 'date-fns';
+import { getMealMonthDateRange } from '@/lib/mealMonth';
+import { sortByRoll } from '@/lib/sortMembers';
+
+const MONTH_QUERY_LIMIT = 10000;
+
+type MealMonthRecord = {
+  id: string;
+  month: number;
+  year: number;
+  is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  meal_rate: number | null;
+  total_expense: number | null;
+  extra_charge: number;
+  min_meals?: number | null;
+  manager_user_id: string | null;
+  created_at: string;
+};
+
+export default function MonthSettings() {
+  const { user } = useAuth();
+  const [allMonths, setAllMonths] = useState<MealMonthRecord[]>([]);
+  const [selectedMonthId, setSelectedMonthId] = useState<string>('');
+  const [manualMealRate, setManualMealRate] = useState('');
+  const [extraCharge, setExtraCharge] = useState('');
+  const [minMeals, setMinMeals] = useState('');
+  const [totalExpense, setTotalExpense] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [totalMeals, setTotalMeals] = useState(0);
+  const [members, setMembers] = useState<any[]>([]);
+  const [nextManager, setNextManager] = useState('');
+  const [adminPortalPassword, setAdminPortalPassword] = useState('');
+  const [adminPortalPasswordConfirm, setAdminPortalPasswordConfirm] = useState('');
+  const [signupEnabled, setSignupEnabled] = useState(true);
+  const [cutoffHour, setCutoffHour] = useState(22);
+  const [cutoffMinute, setCutoffMinute] = useState(0);
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [newMonthStart, setNewMonthStart] = useState('');
+  const [newMonthEnd, setNewMonthEnd] = useState('');
+  const [finalizing, setFinalizing] = useState(false);
+  const [showNewMonthForm, setShowNewMonthForm] = useState(false);
+  const [newMonthFormStart, setNewMonthFormStart] = useState('');
+  const [newMonthFormEnd, setNewMonthFormEnd] = useState('');
+  const now = new Date();
+
+  const fetchAllMonths = useCallback(async () => {
+    const { data } = await supabase
+      .from('meal_months')
+      .select('*')
+      .order('created_at', { ascending: false });
+    const months = (data || []) as MealMonthRecord[];
+    setAllMonths(months);
+
+    // Auto-select active month or first
+    if (!selectedMonthId || !months.find(m => m.id === selectedMonthId)) {
+      const active = months.find(m => m.is_active) || months[0];
+      if (active) setSelectedMonthId(active.id);
+    }
+    return months;
+  }, [selectedMonthId]);
+
+  const fetchMembers = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('user_id, full_name, roll_number').eq('is_active', true).order('full_name');
+    setMembers(sortByRoll(data || []));
+  }, []);
+
+  const fetchAppSettings = useCallback(async () => {
+    const { data } = await supabase.from('app_settings' as any).select('signup_enabled, telegram_chat_id, telegram_enabled, meal_cutoff_hour, meal_cutoff_minute').eq('id', 1).single();
+    if (data) {
+      setSignupEnabled((data as any).signup_enabled);
+      setTelegramChatId((data as any).telegram_chat_id || '');
+      setTelegramEnabled((data as any).telegram_enabled ?? true);
+      setCutoffHour((data as any).meal_cutoff_hour ?? 22);
+      setCutoffMinute((data as any).meal_cutoff_minute ?? 0);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllMonths();
+    fetchMembers();
+    fetchAppSettings();
+  }, []);
+
+  // When selected month changes, load its data
+  const selectedMonth = allMonths.find(m => m.id === selectedMonthId) || null;
+
+  useEffect(() => {
+    if (selectedMonth) {
+      setManualMealRate(String(selectedMonth.meal_rate || ''));
+      setExtraCharge(String(selectedMonth.extra_charge || ''));
+      setMinMeals(String((selectedMonth as any).min_meals || ''));
+      setTotalExpense(String(selectedMonth.total_expense || ''));
+      setStartDate(selectedMonth.start_date || '');
+      setEndDate(selectedMonth.end_date || '');
+      fetchMonthMealCount(selectedMonth);
+    }
+  }, [selectedMonthId, allMonths]);
+
+  const fetchMonthMealCount = async (month: MealMonthRecord) => {
+    const { start: sd, end: ed } = getMealMonthDateRange(month, now);
+    const [mealsRes, extraRes] = await Promise.all([
+      supabase.from('daily_meals').select('lunch, dinner, lunch_extra_option, meal_date').gte('meal_date', sd).lte('meal_date', ed).limit(MONTH_QUERY_LIMIT),
+      supabase.from('extra_meals').select('quantity, meal_count_equivalent').gte('meal_date', sd).lte('meal_date', ed).limit(MONTH_QUERY_LIMIT),
+    ]);
+
+    const regularMeals = (mealsRes.data || []).reduce((a, m) => {
+      let count = (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
+      if (m.lunch && m.lunch_extra_option) {
+        const dayOfWeek = new Date(m.meal_date).getDay();
+        const isFeastDay = dayOfWeek === 1 || dayOfWeek === 5;
+        if (isFeastDay) {
+          count += m.lunch_extra_option.split(',').filter(Boolean).length * 3;
+        }
+      }
+      return a + count;
+    }, 0);
+    const extraMeals = (extraRes.data || []).reduce((a, e) => a + e.quantity * e.meal_count_equivalent, 0);
+    setTotalMeals(regularMeals + extraMeals);
+  };
+
+  const saveMonthSettings = async () => {
+    if (!user || !selectedMonth) return;
+    const expense = parseFloat(totalExpense) || 0;
+    const manualRate = parseFloat(manualMealRate) || 0;
+    const rate = manualRate > 0 ? manualRate : (totalMeals > 0 ? expense / totalMeals : 0);
+    const charge = parseFloat(extraCharge) || 0;
+    const minM = parseFloat(minMeals) || 0;
+
+    const { error } = await supabase.from('meal_months').update({
+      total_expense: expense,
+      meal_rate: rate,
+      extra_charge: charge,
+      min_meals: minM,
+      start_date: startDate || null,
+      end_date: endDate || null,
+    } as any).eq('id', selectedMonth.id);
+
+    if (error) { toast.error(error.message); return; }
+    toast.success('মাসের সেটিংস আপডেট হয়েছে');
+    fetchAllMonths();
+  };
+
+  // Create a brand new month
+  const createNewMonth = async () => {
+    if (!user || !newMonthFormStart || !newMonthFormEnd) return;
+    const parsedStart = new Date(newMonthFormStart);
+
+    // Deactivate all
+    await supabase.from('meal_months').update({ is_active: false } as any).eq('is_active', true);
+
+    const { data: newMonth, error } = await supabase.from('meal_months').insert({
+      month: parsedStart.getMonth() + 1,
+      year: parsedStart.getFullYear(),
+      total_expense: 0,
+      meal_rate: 0,
+      extra_charge: 0,
+      is_active: true,
+      manager_user_id: user.id,
+      start_date: newMonthFormStart,
+      end_date: newMonthFormEnd,
+    } as any).select().single();
+
+    if (error) { toast.error(error.message); return; }
+    toast.success('নতুন মাস তৈরি হয়েছে');
+    setShowNewMonthForm(false);
+    setNewMonthFormStart('');
+    setNewMonthFormEnd('');
+    const months = await fetchAllMonths();
+    if (newMonth) setSelectedMonthId((newMonth as any).id);
+  };
+
+  // Finalize selected month: calculate carry-forward and create/update next month
+  const finalizeMonth = async () => {
+    if (!user || !selectedMonth) return;
+    setFinalizing(true);
+
+    try {
+      const currentRate = Number(selectedMonth.meal_rate) || 0;
+      const currentExtraCharge = Number(selectedMonth.extra_charge ?? 0);
+
+      if (currentRate <= 0) {
+        toast.error('আগে মিল রেট সেট করুন!');
+        setFinalizing(false);
+        return;
+      }
+
+      const { start: sd, end: ed } = getMealMonthDateRange(selectedMonth, now);
+
+      const [membersRes, mealsRes, extraRes, paymentsRes, prevBalRes] = await Promise.all([
+        supabase.from('profiles').select('user_id').eq('is_active', true),
+        supabase.from('daily_meals').select('user_id, lunch, dinner').gte('meal_date', sd).lte('meal_date', ed).limit(MONTH_QUERY_LIMIT),
+        supabase.from('extra_meals').select('user_id, quantity, meal_count_equivalent').gte('meal_date', sd).lte('meal_date', ed).limit(MONTH_QUERY_LIMIT),
+        supabase.from('payments').select('user_id, amount').eq('month_id', selectedMonth.id),
+        supabase.from('member_balances').select('user_id, carry_forward').eq('month_id', selectedMonth.id),
+      ]);
+
+      const activeUsers = (membersRes.data || []).map(m => m.user_id);
+
+      // Per-user meals
+      const userMealMap = new Map<string, number>();
+      (mealsRes.data || []).forEach(m => {
+        const count = (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
+        userMealMap.set(m.user_id, (userMealMap.get(m.user_id) || 0) + count);
+      });
+      (extraRes.data || []).forEach(e => {
+        userMealMap.set(e.user_id, (userMealMap.get(e.user_id) || 0) + e.quantity * e.meal_count_equivalent);
+      });
+
+      // Per-user payments
+      const userPaidMap = new Map<string, number>();
+      (paymentsRes.data || []).forEach(p => {
+        userPaidMap.set(p.user_id, (userPaidMap.get(p.user_id) || 0) + Number(p.amount));
+      });
+
+      // Previous carry
+      const prevCarryMap = new Map<string, number>();
+      (prevBalRes.data || []).forEach(b => {
+        prevCarryMap.set(b.user_id, Number(b.carry_forward));
+      });
+
+      // Find or create next month
+      let nextMonthId: string;
+      const nextMonthRecord = allMonths.find(m => m.id !== selectedMonth.id && m.is_active);
+
+      if (nextMonthRecord) {
+        nextMonthId = nextMonthRecord.id;
+      } else if (newMonthStart && newMonthEnd) {
+        // Create next month
+        const parsedStart = new Date(newMonthStart);
+        await supabase.from('meal_months').update({ is_active: false } as any).eq('is_active', true);
+
+        const { data: newMonth, error } = await supabase.from('meal_months').insert({
+          month: parsedStart.getMonth() + 1,
+          year: parsedStart.getFullYear(),
+          total_expense: 0,
+          meal_rate: 0,
+          extra_charge: 0,
+          is_active: true,
+          manager_user_id: user.id,
+          start_date: newMonthStart,
+          end_date: newMonthEnd,
+        } as any).select().single();
+
+        if (error || !newMonth) {
+          toast.error('নতুন মাস তৈরি ব্যর্থ: ' + (error?.message || ''));
+          setFinalizing(false);
+          return;
+        }
+        nextMonthId = (newMonth as any).id;
+      } else {
+        toast.error('নতুন মাসের তারিখ দিন!');
+        setFinalizing(false);
+        return;
+      }
+
+      // Mark finalized month as inactive
+      await supabase.from('meal_months').update({ is_active: false } as any).eq('id', selectedMonth.id);
+
+      // Calculate carry-forward
+      const currentMinMeals = Number((selectedMonth as any).min_meals ?? 0);
+      const balanceRows = activeUsers.map(userId => {
+        const rawMeals = userMealMap.get(userId) || 0;
+        const meals = currentMinMeals > 0 && rawMeals < currentMinMeals ? currentMinMeals : rawMeals;
+        const cost = meals * currentRate + currentExtraCharge;
+        const prevCarry = prevCarryMap.get(userId) || 0;
+        const totalDue = cost + prevCarry;
+        const paid = userPaidMap.get(userId) || 0;
+        const balance = paid - totalDue; // positive = overpaid
+
+        return {
+          user_id: userId,
+          month_id: nextMonthId,
+          carry_forward: -balance, // positive = user owes money
+          total_meals: 0,
+          total_paid: 0,
+          total_amount: 0,
+        };
+      });
+
+      if (balanceRows.length > 0) {
+        const { error: balError } = await supabase.from('member_balances').upsert(
+          balanceRows as any,
+          { onConflict: 'user_id,month_id' }
+        );
+        if (balError) toast.error('ক্যারি ফরওয়ার্ড সেভ ব্যর্থ: ' + balError.message);
+      }
+
+      toast.success('মাস শেষ হয়েছে! ক্যারি ফরওয়ার্ড নতুন মাসে যুক্ত হয়েছে।');
+      setShowFinalizeDialog(false);
+      const months = await fetchAllMonths();
+      setSelectedMonthId(nextMonthId);
+    } catch (err: any) {
+      toast.error(err.message || 'ত্রুটি হয়েছে');
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
+  const assignNextManager = async () => {
+    if (!nextManager) return;
+    await supabase.from('user_roles').upsert({ user_id: nextManager, role: 'meal_manager' as any });
+    toast.success('নতুন ম্যানেজার নির্ধারণ হয়েছে');
+  };
+
+  const saveTelegramChatId = async () => {
+    const { error } = await supabase.from('app_settings' as any).update({ telegram_chat_id: telegramChatId || null, updated_at: new Date().toISOString(), updated_by: user?.id } as any).eq('id', 1);
+    if (error) toast.error(error.message);
+    else toast.success('Telegram Chat ID সেভ হয়েছে');
+  };
+
+  const toggleTelegramEnabled = async (val: boolean) => {
+    setTelegramEnabled(val);
+    const { error } = await supabase.from('app_settings' as any).update({ telegram_enabled: val, updated_at: new Date().toISOString(), updated_by: user?.id } as any).eq('id', 1);
+    if (error) {
+      toast.error(error.message);
+      setTelegramEnabled(!val);
+    } else {
+      toast.success(val ? 'Telegram বট চালু হয়েছে' : 'Telegram বট বন্ধ হয়েছে');
+    }
+  };
+
+  const toggleSignup = async (val: boolean) => {
+    setSignupEnabled(val);
+    const { error } = await supabase.from('app_settings' as any).update({ signup_enabled: val, updated_at: new Date().toISOString(), updated_by: user?.id } as any).eq('id', 1);
+    if (error) {
+      toast.error(error.message);
+      setSignupEnabled(!val);
+    } else {
+      toast.success(val ? 'সাইনআপ চালু হয়েছে' : 'সাইনআপ বন্ধ হয়েছে');
+    }
+  };
+
+  const updateAdminPortalPassword = async () => {
+    if (!adminPortalPassword || adminPortalPassword.length < 6) {
+      toast.error('Dedicated Admin Password কমপক্ষে ৬ অক্ষরের হতে হবে');
+      return;
+    }
+    if (adminPortalPassword !== adminPortalPasswordConfirm) {
+      toast.error('Dedicated Admin Password মেলেনি');
+      return;
+    }
+    const { error } = await supabase.rpc('set_admin_portal_password' as any, { _new_password: adminPortalPassword });
+    if (error) { toast.error(error.message); return; }
+    setAdminPortalPassword('');
+    setAdminPortalPasswordConfirm('');
+    toast.success('Dedicated Admin Password আপডেট হয়েছে');
+  };
+
+  const openFinalizeDialog = () => {
+    if (selectedMonth?.end_date) {
+      const nextDay = new Date(selectedMonth.end_date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      setNewMonthStart(format(nextDay, 'yyyy-MM-dd'));
+      const nextEnd = new Date(nextDay);
+      nextEnd.setMonth(nextEnd.getMonth() + 1);
+      nextEnd.setDate(nextEnd.getDate() - 1);
+      setNewMonthEnd(format(nextEnd, 'yyyy-MM-dd'));
+    }
+    setShowFinalizeDialog(true);
+  };
+
+  const calculatedRate = totalMeals > 0 ? (parseFloat(totalExpense) || 0) / totalMeals : 0;
+  const displayRate = parseFloat(manualMealRate) || calculatedRate;
+
+  const getMonthLabel = (m: MealMonthRecord) => {
+    if (m.start_date && m.end_date) {
+      return `${format(new Date(m.start_date), 'dd MMM')} — ${format(new Date(m.end_date), 'dd MMM yyyy')}`;
+    }
+    return `${m.year}-${String(m.month).padStart(2, '0')}`;
+  };
+
+  // Check if there's an active next month already
+  const hasActiveNextMonth = allMonths.some(m => m.id !== selectedMonthId && m.is_active);
+
+  return (
+    <div className="space-y-6 page-enter stagger-children">
+      {/* Month Selector */}
+      <Card className="holo-card animate-fade-in-up overflow-hidden">
+        <CardHeader>
+          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+            <CalendarDays className="h-5 w-5 text-primary animate-float" /> মাস নির্বাচন
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={selectedMonthId} onValueChange={setSelectedMonthId}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="মাস নির্বাচন করুন" />
+              </SelectTrigger>
+              <SelectContent>
+                {allMonths.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    <span className="flex items-center gap-2">
+                      {getMonthLabel(m)}
+                      {m.is_active && <Badge variant="default" className="text-[10px] py-0">সক্রিয়</Badge>}
+                      {Number(m.meal_rate) > 0 && <Badge variant="secondary" className="text-[10px] py-0">রেট: ৳{Number(m.meal_rate).toFixed(0)}</Badge>}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="font-bengali gap-1" onClick={() => setShowNewMonthForm(true)}>
+              <Plus className="h-4 w-4" /> নতুন মাস
+            </Button>
+          </div>
+
+          {selectedMonth && (
+            <div className="flex flex-wrap gap-2 text-xs font-bengali">
+              {selectedMonth.is_active ? (
+                <Badge className="bg-primary">সক্রিয় মাস</Badge>
+              ) : (
+                <Badge variant="secondary">পুরোনো মাস</Badge>
+              )}
+              {Number(selectedMonth.meal_rate) > 0 ? (
+                <Badge variant="outline">রেট সেট করা আছে: ৳{Number(selectedMonth.meal_rate).toFixed(2)}</Badge>
+              ) : (
+                <Badge variant="destructive">রেট সেট হয়নি</Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Month Settings (for selected month) */}
+      {selectedMonth && (
+        <Card className="holo-card overflow-hidden animate-fade-in-up">
+          <CardHeader>
+            <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+              <Settings className="h-5 w-5 text-primary" style={{ animation: 'spin-slow 12s linear infinite' }} /> মাসের সেটিংস — {getMonthLabel(selectedMonth)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="font-bengali">শুরুর তারিখ</Label>
+                    <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="font-bengali">শেষ তারিখ</Label>
+                    <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-bengali">মিল রেট (টাকা)</Label>
+                  <Input type="number" value={manualMealRate} onChange={e => setManualMealRate(e.target.value)} placeholder="যেমন: 65" />
+                  <p className="text-xs text-muted-foreground font-bengali mt-1">
+                    যেকোনো সময় যেকোনো মাসের রেট সেট/পরিবর্তন করুন
+                  </p>
+                </div>
+                <div>
+                  <Label className="font-bengali">অতিরিক্ত চার্জ (টাকা/মাস)</Label>
+                  <Input type="number" value={extraCharge} onChange={e => setExtraCharge(e.target.value)} placeholder="যেমন: 200" />
+                </div>
+                <div>
+                  <Label className="font-bengali">সর্বনিম্ন মিল (Minimum Meals)</Label>
+                  <Input type="number" value={minMeals} onChange={e => setMinMeals(e.target.value)} placeholder="যেমন: 30" min="0" />
+                  <p className="text-xs text-muted-foreground font-bengali mt-1">
+                    কারো মিল এই সংখ্যার নিচে হলে, হিসাবে এই সংখ্যাই গণ্য হবে। ০ মানে নিষ্ক্রিয়।
+                  </p>
+                </div>
+                <div>
+                  <Label className="font-bengali">মোট খরচ (টাকা) — ঐচ্ছিক</Label>
+                  <Input type="number" value={totalExpense} onChange={e => setTotalExpense(e.target.value)} placeholder="মোট খরচ লিখুন" />
+                </div>
+
+                {/* Summary */}
+                <div className="p-4 rounded-lg bg-secondary/50 space-y-2">
+                  <div className="flex justify-between font-bengali text-xs text-muted-foreground">
+                    <span>মিলের সময়কাল:</span>
+                    <span>{startDate && endDate ? `${format(new Date(startDate), 'dd MMM')} — ${format(new Date(endDate), 'dd MMM yyyy')}` : 'সেট করুন'}</span>
+                  </div>
+                  <div className="flex justify-between font-bengali">
+                    <span>মোট মিল:</span>
+                    <span className="font-bold">{totalMeals}</span>
+                  </div>
+                  <div className="flex justify-between font-bengali">
+                    <span>ক্যালকুলেটেড রেট:</span>
+                    <span className="text-muted-foreground">৳{calculatedRate.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bengali">
+                    <span>সক্রিয় মিল রেট:</span>
+                    <span className="font-bold text-primary">৳{displayRate.toFixed(2)}</span>
+                  </div>
+                  {parseFloat(extraCharge) > 0 && (
+                    <div className="flex justify-between font-bengali">
+                      <span>অতিরিক্ত চার্জ:</span>
+                      <span className="font-bold text-destructive">৳{parseFloat(extraCharge).toFixed(0)}/মাস</span>
+                    </div>
+                  )}
+                </div>
+
+                <Button onClick={saveMonthSettings} className="w-full font-bengali gap-1">
+                  <Save className="h-4 w-4" /> সেভ করুন
+                </Button>
+
+                {/* Finalize — only for months with rate set */}
+                {Number(selectedMonth.meal_rate) > 0 && (
+                  <Button onClick={openFinalizeDialog} variant="destructive" className="w-full font-bengali gap-1">
+                    <ArrowRightCircle className="h-4 w-4" /> মাস শেষ করুন ও ক্যারি ফরওয়ার্ড
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="font-bengali">পরবর্তী ম্যানেজার নির্ধারণ</Label>
+                  <Select value={nextManager} onValueChange={setNextManager}>
+                    <SelectTrigger><SelectValue placeholder="সদস্য নির্বাচন করুন" /></SelectTrigger>
+                    <SelectContent>
+                      {members.map(m => <SelectItem key={m.user_id} value={m.user_id}>{m.full_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={assignNextManager} variant="secondary" className="w-full font-bengali gap-1" disabled={!nextManager}>
+                  <UserCheck className="h-4 w-4" /> ম্যানেজার নির্ধারণ করুন
+                </Button>
+
+                <Card className="border-dashed">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="h-4 w-4 text-muted-foreground" />
+                        <Label className="font-bengali">সাইনআপ অপশন</Label>
+                      </div>
+                      <Switch checked={signupEnabled} onCheckedChange={toggleSignup} />
+                    </div>
+                    <p className="text-xs text-muted-foreground font-bengali mt-2">
+                      {signupEnabled ? 'চালু — রেজিস্ট্রেশন ট্যাব দেখাবে' : 'বন্ধ — রেজিস্ট্রেশন ট্যাব লুকানো'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Info: How billing works */}
+      <Card className="border-dashed border-primary/30">
+        <CardContent className="p-4">
+          <h4 className="font-bengali font-bold text-sm mb-2 flex items-center gap-2">
+            <History className="h-4 w-4" /> হিসাবের নিয়ম
+          </h4>
+          <ul className="text-xs text-muted-foreground font-bengali space-y-1 list-disc list-inside">
+            <li>প্রতিটি মাসের custom তারিখ range সেট করুন</li>
+            <li>মাস চলাকালীন পেমেন্ট জমা নিন — ওই মাসের হিসাবে জমা থাকবে</li>
+            <li>পরের মাসে মিল রেট আসলে, আগের মাসের রেট সেট করুন</li>
+            <li>রেট সেট করে "মাস শেষ করুন" → বকেয়া/পাওনা অটো নতুন মাসে carry হবে</li>
+            <li>নতুন মাসে নতুন পেমেন্ট আলাদাভাবে ট্র্যাক হবে</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Telegram */}
+      <Card className="holo-card overflow-hidden animate-fade-in-up">
+        <CardHeader>
+          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+            <Send className="h-5 w-5 text-primary animate-float" /> Telegram রিমাইন্ডার
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 max-w-xl">
+          <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 p-3">
+            <div>
+              <Label className="font-bengali text-sm">Telegram বট {telegramEnabled ? 'চালু' : 'বন্ধ'}</Label>
+              <p className="text-xs text-muted-foreground font-bengali mt-0.5">
+                বন্ধ করলে Telegram-এ কোনো রিমাইন্ডার যাবে না
+              </p>
+            </div>
+            <Switch checked={telegramEnabled} onCheckedChange={toggleTelegramEnabled} />
+          </div>
+          <div>
+            <Label className="font-bengali">Telegram Group Chat ID</Label>
+            <Input value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} placeholder="-100xxxxxxxxxx" />
+            <p className="text-xs text-muted-foreground font-bengali mt-1">
+              Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান। রাত ৯:০০, ৯:৩০ এবং ৯:৫৫ মিনিটে মিল আপডেটের রিমাইন্ডার যাবে।
+            </p>
+          </div>
+          <Button onClick={saveTelegramChatId} className="font-bengali gap-1">
+            <Send className="h-4 w-4" /> Chat ID সেভ করুন
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Meal Cutoff Time */}
+      <Card className="holo-card overflow-hidden animate-fade-in-up">
+        <CardHeader>
+          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+            <Clock className="h-5 w-5 text-primary animate-float" /> মিল আপডেট কাটঅফ টাইম
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 max-w-xl">
+          <p className="text-xs text-muted-foreground font-bengali">
+            এই সময়ের পর স্টুডেন্টরা মিল আপডেট করতে পারবে না। ডিফল্ট: রাত ১০:০০ PM
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <Label className="font-bengali">ঘণ্টা (0-23)</Label>
+              <Input type="number" min="0" max="23" value={cutoffHour} onChange={e => setCutoffHour(parseInt(e.target.value) || 0)} />
+            </div>
+            <div className="flex-1">
+              <Label className="font-bengali">মিনিট (0-59)</Label>
+              <Input type="number" min="0" max="59" value={cutoffMinute} onChange={e => setCutoffMinute(parseInt(e.target.value) || 0)} />
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-secondary/50">
+            <p className="text-sm font-bengali">
+              বর্তমান কাটঅফ: <span className="font-bold text-primary">{String(cutoffHour).padStart(2, '0')}:{String(cutoffMinute).padStart(2, '0')}</span>
+              <span className="text-muted-foreground ml-2">
+                ({cutoffHour >= 12 ? `${cutoffHour === 12 ? 12 : cutoffHour - 12}:${String(cutoffMinute).padStart(2, '0')} PM` : `${cutoffHour === 0 ? 12 : cutoffHour}:${String(cutoffMinute).padStart(2, '0')} AM`})
+              </span>
+            </p>
+          </div>
+          <Button onClick={async () => {
+            const { error } = await supabase.from('app_settings' as any).update({
+              meal_cutoff_hour: cutoffHour,
+              meal_cutoff_minute: cutoffMinute,
+              updated_at: new Date().toISOString(),
+              updated_by: user?.id,
+            } as any).eq('id', 1);
+            if (error) toast.error(error.message);
+            else toast.success('কাটঅফ টাইম আপডেট হয়েছে');
+          }} className="font-bengali gap-1">
+            <Clock className="h-4 w-4" /> কাটঅফ টাইম সেভ করুন
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Admin Password */}
+      <Card className="holo-card overflow-hidden animate-fade-in-up">
+        <CardHeader>
+          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+            <ShieldCheck className="h-5 w-5 text-primary animate-glow-pulse" /> Dedicated Admin Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 max-w-xl">
+          <div>
+            <Label className="font-bengali">নতুন Password</Label>
+            <Input type="password" value={adminPortalPassword} onChange={(e) => setAdminPortalPassword(e.target.value)} placeholder="কমপক্ষে ৬ অক্ষর" />
+          </div>
+          <div>
+            <Label className="font-bengali">পুনরায় লিখুন</Label>
+            <Input type="password" value={adminPortalPasswordConfirm} onChange={(e) => setAdminPortalPasswordConfirm(e.target.value)} placeholder="একই পাসওয়ার্ড আবার" />
+          </div>
+          <Button onClick={updateAdminPortalPassword} className="font-bengali gap-1">
+            <ShieldCheck className="h-4 w-4" /> সেভ করুন
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* New Month Dialog */}
+      <Dialog open={showNewMonthForm} onOpenChange={setShowNewMonthForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-bengali">নতুন মাস তৈরি করুন</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="font-bengali">শুরুর তারিখ</Label>
+              <Input type="date" value={newMonthFormStart} onChange={e => setNewMonthFormStart(e.target.value)} />
+            </div>
+            <div>
+              <Label className="font-bengali">শেষ তারিখ</Label>
+              <Input type="date" value={newMonthFormEnd} onChange={e => setNewMonthFormEnd(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewMonthForm(false)} className="font-bengali">বাতিল</Button>
+            <Button onClick={createNewMonth} disabled={!newMonthFormStart || !newMonthFormEnd} className="font-bengali gap-1">
+              <CalendarDays className="h-4 w-4" /> তৈরি করুন
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Finalize Month Dialog */}
+      <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-bengali">মাস শেষ করুন ও ক্যারি ফরওয়ার্ড</DialogTitle>
+            <DialogDescription className="font-bengali">
+              এই মাসের হিসাব (মিল × রেট + অতিরিক্ত চার্জ + আগের বকেয়া − জমা) ক্যারি ফরওয়ার্ড হিসেবে পরবর্তী মাসে যুক্ত হবে।
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-secondary/50 font-bengali text-sm space-y-1">
+              <p>মাস: <span className="font-bold">{selectedMonth && getMonthLabel(selectedMonth)}</span></p>
+              <p>মিল রেট: <span className="font-bold">৳{Number(selectedMonth?.meal_rate || 0).toFixed(2)}</span></p>
+              <p>অতিরিক্ত চার্জ: <span className="font-bold">৳{Number(selectedMonth?.extra_charge || 0)}</span></p>
+            </div>
+
+            {hasActiveNextMonth ? (
+              <p className="text-sm font-bengali text-primary">
+                ✓ পরবর্তী সক্রিয় মাস আছে — সেখানে ক্যারি ফরওয়ার্ড যুক্ত হবে
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="font-bengali">নতুন মাসের শুরু</Label>
+                  <Input type="date" value={newMonthStart} onChange={e => setNewMonthStart(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="font-bengali">নতুন মাসের শেষ</Label>
+                  <Input type="date" value={newMonthEnd} onChange={e => setNewMonthEnd(e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFinalizeDialog(false)} className="font-bengali">বাতিল</Button>
+            <Button variant="destructive" onClick={finalizeMonth} disabled={finalizing || (!hasActiveNextMonth && (!newMonthStart || !newMonthEnd))} className="font-bengali gap-1">
+              <ArrowRightCircle className="h-4 w-4" />
+              {finalizing ? 'প্রসেসিং...' : 'মাস শেষ করুন'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

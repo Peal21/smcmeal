@@ -1,0 +1,1 @@
+ALTER TABLE public.member_balances ADD COLUMN IF NOT EXISTS meal_count_override numeric;

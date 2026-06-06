@@ -1,0 +1,1 @@
+ALTER TABLE public.meal_months ADD COLUMN IF NOT EXISTS min_meals numeric NOT NULL DEFAULT 0;

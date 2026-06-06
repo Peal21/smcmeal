@@ -1,0 +1,1 @@
+ALTER TABLE public.extra_meals ADD COLUMN extra_option text;

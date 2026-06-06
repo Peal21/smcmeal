@@ -1,0 +1,7 @@
+project_id = "fmleplqssxndaynmxhjr"
+
+[functions.master-admin-login]
+verify_jwt = false
+
+[functions.telegram-meal-reminder]
+verify_jwt = false
