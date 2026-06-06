@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://fmleplqssxndaynmxhjr.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtbGVwbHFzc3huZGF5bm14aGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjEzNTEsImV4cCI6MjA5MDAzNzM1MX0.pNIo5AR3w1spZJmNT_FI1OWLacRZfX9akSELG5YByGU";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjYnNiZ2psa3F1Z3dsa2lsaW5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjUxMTIsImV4cCI6MjA5NjM0MTExMn0.3FVKy1EPRKeVt3poEKZsV-x5xgFIp5oT37Nzaue737I";
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.warn(
@@ -13,7 +13,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 }
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL || "https://fmleplqssxndaynmxhjr.supabase.co",
+  SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co",
   SUPABASE_PUBLISHABLE_KEY || "placeholder",
   {
     auth: {
