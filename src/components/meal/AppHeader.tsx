@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UtensilsCrossed, LogOut, User, Sparkles, Sun, Moon, Settings, GraduationCap } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { playClickSound } from '@/lib/sounds';
 
 export default function AppHeader() {
   const { profile, signOut, isManager, isAdmin, adminMode, enableAdminMode, disableAdminMode } = useAuth();
@@ -36,7 +37,10 @@ export default function AppHeader() {
             <Button
               variant="outline"
               size="sm"
-              onClick={adminMode ? disableAdminMode : enableAdminMode}
+              onClick={() => {
+                playClickSound();
+                if (adminMode) disableAdminMode(); else enableAdminMode();
+              }}
               className={`font-bengali h-8 text-[11px] px-2.5 rounded-xl border border-primary/20 hover:scale-105 transition-all duration-300 flex items-center gap-1.5 shadow-sm ${
                 adminMode 
                   ? 'bg-gradient-to-r from-primary/10 to-info/10 text-primary hover:bg-primary/25 border-primary/30' 
@@ -61,7 +65,10 @@ export default function AppHeader() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            onClick={() => {
+              playClickSound();
+              setTheme(theme === 'dark' ? 'light' : 'dark');
+            }}
             className="h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:rotate-45"
             title="Theme Switcher"
           >
@@ -83,7 +90,10 @@ export default function AppHeader() {
             </div>
           </div>
           
-          <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all duration-500 hover:rotate-12 hover:scale-110" title="Logout">
+          <Button variant="ghost" size="icon" onClick={() => {
+            playClickSound();
+            signOut();
+          }} className="h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all duration-500 hover:rotate-12 hover:scale-110" title="Logout">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>

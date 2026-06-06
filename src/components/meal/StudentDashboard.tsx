@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { playToggleOnSound, playToggleOffSound, playSuccessSound, playClickSound } from '@/lib/sounds';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -330,9 +331,14 @@ export default function StudentDashboard() {
       }
       await fetchTodayMeal();
       const label = type === 'lunch' ? 'লাঞ্চ' : 'ডিনার';
-      if (value) notify(`${label} চালু করা হয়েছে`);
-      else if (offTodayOnly) notify(`${label} শুধু আগামীকালের জন্য বন্ধ — পরের দিন আবার চালু হবে`);
-      else notify(`${label} বন্ধ করা হয়েছে (যতক্ষণ না আপনি আবার চালু করেন)`);
+      if (value) {
+        playToggleOnSound();
+        notify(`${label} চালু করা হয়েছে`);
+      } else {
+        playToggleOffSound();
+        if (offTodayOnly) notify(`${label} শুধু আগামীকালের জন্য বন্ধ — পরের দিন আবার চালু হবে`);
+        else notify(`${label} বন্ধ করা হয়েছে (যতক্ষণ না আপনি আবার চালু করেন)`);
+      }
     } catch (err: any) {
       console.error('Toggle meal error:', err);
       toast.error('সমস্যা হয়েছে: ' + (err?.message || 'Unknown error'));
@@ -372,6 +378,7 @@ export default function StudentDashboard() {
       await supabase.from('daily_meals').insert({ user_id: user.id, meal_date: mealDate, lunch_extra_option: stored });
     }
     fetchTodayMeal();
+    playClickSound();
     notify('Extra option আপডেট হয়েছে');
   };
 
@@ -448,6 +455,7 @@ export default function StudentDashboard() {
         extra_option: extraOptionStr,
       } as any).eq('id', editingExtraMealId);
       if (error) { toast.error(error.message); return; }
+      playSuccessSound();
       notify('আপডেট হয়েছে');
     } else {
       const mealDateObj = new Date(mealDate);
@@ -467,6 +475,7 @@ export default function StudentDashboard() {
       } as any);
 
       if (error) { toast.error(error.message); return; }
+      playSuccessSound();
       notify(`${qty}টি অতিরিক্ত ${extraMealType === 'lunch' ? 'লাঞ্চ' : 'ডিনার'} যোগ হয়েছে${isFeast ? ' (Feast Day — ১টি = ৩ মিল)' : ''}`);
       setExtraQuantity('0');
       setExtraReason('');
@@ -480,7 +489,10 @@ export default function StudentDashboard() {
     if (!canEditExtraMeal(mealDateStr)) { toast.error('এই দিনের Extra মিল আর পরিবর্তন করা যাবে না (রাত ১০:০০ পার)'); return; }
     const { error } = await supabase.from('extra_meals').delete().eq('id', id);
     if (error) toast.error(error.message);
-    else notify('অতিরিক্ত মিল মুছে ফেলা হয়েছে');
+    else {
+      playToggleOffSound();
+      notify('অতিরিক্ত মিল মুছে ফেলা হয়েছে');
+    }
   };
 
 

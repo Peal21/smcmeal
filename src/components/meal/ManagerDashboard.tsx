@@ -11,6 +11,7 @@ import AutoCarryControl from './manager/AutoCarryControl';
 import SpecialDayItemManager from './manager/SpecialDayItemManager';
 import FeastDayManager from './manager/FeastDayManager';
 import { LayoutDashboard, Users, CreditCard, Settings, FileSpreadsheet, Plus, Calculator, RefreshCw, Star, Flame } from 'lucide-react';
+import { playClickSound } from '@/lib/sounds';
 
 const tabs = [
   { value: 'overview', label: 'সারসংক্ষেপ', icon: LayoutDashboard },
@@ -27,7 +28,7 @@ const tabs = [
 
 export default function ManagerDashboard() {
   return (
-    <Tabs defaultValue="overview" className="space-y-6 animate-fade-in">
+    <Tabs defaultValue="overview" onValueChange={() => playClickSound()} className="space-y-6 animate-fade-in">
       <ScrollArea className="w-full pb-2">
         <TabsList className="inline-flex w-max gap-1.5 bg-muted/40 border border-border/40 backdrop-blur-md rounded-2xl p-1.5 shadow-md">
           {tabs.map((tab, i) => (
