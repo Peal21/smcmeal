@@ -1,12 +1,20 @@
 -- ===== Migration: 20260325205004_9e77ce7d-4ac0-4398-ba6a-64a64898c2bb.sql =====
 
--- Enums
-CREATE TYPE public.gender_type AS ENUM ('male', 'female');
-CREATE TYPE public.year_type AS ENUM ('1st', '2nd', '3rd', '4th', '5th', 'extra');
-CREATE TYPE public.user_role AS ENUM ('student', 'meal_manager', 'super_admin');
+-- Enums (safe to run multiple times)
+DO $$ BEGIN
+  CREATE TYPE public.gender_type AS ENUM ('male', 'female');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.year_type AS ENUM ('1st', '2nd', '3rd', '4th', '5th', 'extra');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.user_role AS ENUM ('student', 'meal_manager', 'super_admin');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Profiles table
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   full_name TEXT NOT NULL,
@@ -20,7 +28,7 @@ CREATE TABLE public.profiles (
 );
 
 -- User roles table
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   role user_role NOT NULL DEFAULT 'student',
@@ -42,7 +50,7 @@ AS $$
 $$;
 
 -- Meal months
-CREATE TABLE public.meal_months (
+CREATE TABLE IF NOT EXISTS public.meal_months (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
   year INTEGER NOT NULL,
@@ -56,7 +64,7 @@ CREATE TABLE public.meal_months (
 );
 
 -- Daily meals
-CREATE TABLE public.daily_meals (
+CREATE TABLE IF NOT EXISTS public.daily_meals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   meal_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -70,7 +78,7 @@ CREATE TABLE public.daily_meals (
 );
 
 -- Extra meals
-CREATE TABLE public.extra_meals (
+CREATE TABLE IF NOT EXISTS public.extra_meals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   meal_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -84,7 +92,7 @@ CREATE TABLE public.extra_meals (
 );
 
 -- Payments
-CREATE TABLE public.payments (
+CREATE TABLE IF NOT EXISTS public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   month_id UUID REFERENCES public.meal_months(id) ON DELETE CASCADE NOT NULL,
@@ -97,7 +105,7 @@ CREATE TABLE public.payments (
 );
 
 -- Member balances
-CREATE TABLE public.member_balances (
+CREATE TABLE IF NOT EXISTS public.member_balances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   month_id UUID REFERENCES public.meal_months(id) ON DELETE CASCADE NOT NULL,
@@ -120,43 +128,69 @@ ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.member_balances ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
+DROP POLICY IF EXISTS "Anyone authenticated can view profiles" ON public.profiles;
 CREATE POLICY "Anyone authenticated can view profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
 -- User roles policies
+DROP POLICY IF EXISTS "Authenticated can view roles" ON public.user_roles;
 CREATE POLICY "Authenticated can view roles" ON public.user_roles FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Admins can manage roles" ON public.user_roles;
 CREATE POLICY "Admins can manage roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Admins can update roles" ON public.user_roles;
 CREATE POLICY "Admins can update roles" ON public.user_roles FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Admins can delete roles" ON public.user_roles;
 CREATE POLICY "Admins can delete roles" ON public.user_roles FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Meal months policies
+DROP POLICY IF EXISTS "Anyone authenticated can view meal months" ON public.meal_months;
 CREATE POLICY "Anyone authenticated can view meal months" ON public.meal_months FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Managers can insert meal months" ON public.meal_months;
 CREATE POLICY "Managers can insert meal months" ON public.meal_months FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can update meal months" ON public.meal_months;
 CREATE POLICY "Managers can update meal months" ON public.meal_months FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Daily meals policies
+DROP POLICY IF EXISTS "Anyone authenticated can view daily meals" ON public.daily_meals;
 CREATE POLICY "Anyone authenticated can view daily meals" ON public.daily_meals FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Users can insert own meals" ON public.daily_meals;
 CREATE POLICY "Users can insert own meals" ON public.daily_meals FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own meals" ON public.daily_meals;
 CREATE POLICY "Users can update own meals" ON public.daily_meals FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Managers can insert meals" ON public.daily_meals;
 CREATE POLICY "Managers can insert meals" ON public.daily_meals FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can update meals" ON public.daily_meals;
 CREATE POLICY "Managers can update meals" ON public.daily_meals FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Extra meals policies
+DROP POLICY IF EXISTS "Anyone authenticated can view extra meals" ON public.extra_meals;
 CREATE POLICY "Anyone authenticated can view extra meals" ON public.extra_meals FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Users can add own extra meals" ON public.extra_meals;
 CREATE POLICY "Users can add own extra meals" ON public.extra_meals FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Managers can insert extra meals" ON public.extra_meals;
 CREATE POLICY "Managers can insert extra meals" ON public.extra_meals FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can update extra meals" ON public.extra_meals;
 CREATE POLICY "Managers can update extra meals" ON public.extra_meals FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can delete extra meals" ON public.extra_meals;
 CREATE POLICY "Managers can delete extra meals" ON public.extra_meals FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Payments policies
+DROP POLICY IF EXISTS "Users can view own payments" ON public.payments;
 CREATE POLICY "Users can view own payments" ON public.payments FOR SELECT TO authenticated USING (auth.uid() = user_id OR public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can insert payments" ON public.payments;
 CREATE POLICY "Managers can insert payments" ON public.payments FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can update payments" ON public.payments;
 CREATE POLICY "Managers can update payments" ON public.payments FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Member balances policies
+DROP POLICY IF EXISTS "Users can view own balance" ON public.member_balances;
 CREATE POLICY "Users can view own balance" ON public.member_balances FOR SELECT TO authenticated USING (auth.uid() = user_id OR public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can manage balances" ON public.member_balances;
 CREATE POLICY "Managers can manage balances" ON public.member_balances FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can update balances" ON public.member_balances;
 CREATE POLICY "Managers can update balances" ON public.member_balances FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Auto-create profile on signup
@@ -177,6 +211,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON public.handle_new_user;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -190,13 +225,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SET search_path = public;
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+DROP TRIGGER IF EXISTS update_meal_months_updated_at ON public.meal_months;
 CREATE TRIGGER update_meal_months_updated_at BEFORE UPDATE ON public.meal_months FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+DROP TRIGGER IF EXISTS update_daily_meals_updated_at ON public.daily_meals;
 CREATE TRIGGER update_daily_meals_updated_at BEFORE UPDATE ON public.daily_meals FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+DROP TRIGGER IF EXISTS update_member_balances_updated_at ON public.member_balances;
 CREATE TRIGGER update_member_balances_updated_at BEFORE UPDATE ON public.member_balances FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Enable realtime for daily_meals
-ALTER PUBLICATION supabase_realtime ADD TABLE public.daily_meals;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.daily_meals;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 
 -- ===== Migration: 20260325215002_ce0722d4-b7b8-4348-aa5b-3622f4b4919d.sql =====
@@ -410,7 +451,9 @@ USING (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), '
 WITH CHECK (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role));
 
 -- ===== Migration: 20260326210729_4533b2c3-6d5c-4737-a9ad-0718a758ca69.sql =====
-ALTER PUBLICATION supabase_realtime ADD TABLE payments;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE payments;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ===== Migration: 20260327082414_35ce7164-4b6d-4dbe-86d4-1f336aba738b.sql =====
 
@@ -540,7 +583,7 @@ USING (auth.uid() = user_id);
 
 
 -- ===== Migration: 20260328185835_1dcbedf7-cb7a-401e-b4ac-d61be3040d4a.sql =====
-CREATE TABLE public.carry_logs (
+CREATE TABLE IF NOT EXISTS public.carry_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   source_date date NOT NULL,
   target_date date NOT NULL,
@@ -554,10 +597,12 @@ CREATE TABLE public.carry_logs (
 
 ALTER TABLE public.carry_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Managers can view carry logs" ON public.carry_logs;
 CREATE POLICY "Managers can view carry logs" ON public.carry_logs
   FOR SELECT TO authenticated
   USING (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role));
 
+DROP POLICY IF EXISTS "Service can insert carry logs" ON public.carry_logs;
 CREATE POLICY "Service can insert carry logs" ON public.carry_logs
   FOR INSERT WITH CHECK (true);
 
@@ -648,11 +693,17 @@ DROP FUNCTION public.clean_extra_options(text);
 ALTER TABLE public.meal_months ADD COLUMN start_date date, ADD COLUMN end_date date;
 
 -- ===== Migration: 20260402072326_68ea7763-6318-4e37-a79f-f767c597e128.sql =====
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.meal_months;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.meal_months;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ===== Migration: 20260402073218_80087849-7bb5-453c-baaf-03c8d38d12f4.sql =====
-ALTER PUBLICATION supabase_realtime ADD TABLE public.extra_meals;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.extra_meals;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ===== Migration: 20260404172601_aa0cd5fd-da07-4375-9179-aac457ff18d8.sql =====
 
@@ -670,13 +721,16 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Anyone can read app_settings (needed for auth page)
+DROP POLICY IF EXISTS "Anyone can view app settings" ON public.app_settings;
 CREATE POLICY "Anyone can view app settings" ON public.app_settings FOR SELECT TO public USING (true);
 
 -- Only managers can update
+DROP POLICY IF EXISTS "Managers can update app settings" ON public.app_settings;
 CREATE POLICY "Managers can update app settings" ON public.app_settings FOR UPDATE TO authenticated
   USING (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role))
   WITH CHECK (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role));
 
+DROP POLICY IF EXISTS "Managers can insert app settings" ON public.app_settings;
 CREATE POLICY "Managers can insert app settings" ON public.app_settings FOR INSERT TO authenticated
   WITH CHECK (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role));
 
@@ -690,7 +744,7 @@ ALTER TABLE public.app_settings ADD COLUMN IF NOT EXISTS telegram_chat_id text;
 -- ===== Migration: 20260413161544_348d6207-e7c0-4f60-911f-b9762ad412a7.sql =====
 
 -- Special day items created by admin
-CREATE TABLE public.special_day_items (
+CREATE TABLE IF NOT EXISTS public.special_day_items (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   item_name TEXT NOT NULL,
   item_date DATE NOT NULL,
@@ -717,7 +771,7 @@ ON public.special_day_items FOR DELETE TO authenticated
 USING (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role));
 
 -- Student responses to special day items
-CREATE TABLE public.special_day_responses (
+CREATE TABLE IF NOT EXISTS public.special_day_responses (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   item_id UUID NOT NULL REFERENCES public.special_day_items(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
@@ -750,13 +804,18 @@ ON public.special_day_responses FOR SELECT TO authenticated
 USING (has_role(auth.uid(), 'meal_manager'::user_role) OR has_role(auth.uid(), 'super_admin'::user_role));
 
 -- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_special_day_responses_updated_at ON public.special_day_responses;
 CREATE TRIGGER update_special_day_responses_updated_at
 BEFORE UPDATE ON public.special_day_responses
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.special_day_items;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.special_day_responses;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.special_day_items;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.special_day_responses;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 
 -- ===== Migration: 20260413162115_01a91658-a5e6-4dfb-8f38-a8353e8962d6.sql =====
@@ -771,7 +830,7 @@ ALTER TABLE public.extra_meals ADD COLUMN extra_option text;
 
 -- ===== Migration: 20260414043419_28f401a6-099e-44fc-ba3c-95e5383816aa.sql =====
 
-CREATE TABLE public.password_reset_codes (
+CREATE TABLE IF NOT EXISTS public.password_reset_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
   email TEXT NOT NULL,
@@ -783,7 +842,7 @@ CREATE TABLE public.password_reset_codes (
 
 ALTER TABLE public.password_reset_codes ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_password_reset_codes_email ON public.password_reset_codes (email, used, expires_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_email ON public.password_reset_codes (email, used, expires_at);
 
 
 -- ===== Migration: 20260414050756_c9e37277-cdfd-4a0e-87ff-9e033ba112d1.sql =====
@@ -794,7 +853,7 @@ ALTER TABLE public.extra_meals ALTER COLUMN meal_count_equivalent TYPE numeric U
 
 -- ===== Migration: 20260414051423_b9b658e6-76ed-43c5-ae51-f0f224ff5b10.sql =====
 
-CREATE TABLE public.feast_day_config (
+CREATE TABLE IF NOT EXISTS public.feast_day_config (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   feast_date date NOT NULL,
   meal_type text NOT NULL DEFAULT 'both',
@@ -804,7 +863,7 @@ CREATE TABLE public.feast_day_config (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_feast_day_config_date_type ON public.feast_day_config (feast_date, meal_type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_feast_day_config_date_type ON public.feast_day_config (feast_date, meal_type);
 
 ALTER TABLE public.feast_day_config ENABLE ROW LEVEL SECURITY;
 
@@ -839,7 +898,9 @@ ALTER TABLE public.meal_months ADD COLUMN IF NOT EXISTS min_meals numeric NOT NU
 ALTER TABLE public.member_balances ADD COLUMN IF NOT EXISTS meal_count_override numeric;
 
 -- ===== Migration: 20260511183805_87199f9b-fa81-497a-8738-4973db74db0b.sql =====
-ALTER PUBLICATION supabase_realtime ADD TABLE public.member_balances;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.member_balances;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ===== Migration: 20260512045700_07f9855e-6989-4364-aea5-395483c77bb3.sql =====
 
@@ -965,18 +1026,42 @@ END;
 $$;
 
 -- ===== Migration: 20260518114837_09a218e5-ffe7-425b-86e0-c124980a8b82.sql =====
-ALTER TABLE public.daily_meals REPLICA IDENTITY FULL;
-ALTER TABLE public.extra_meals REPLICA IDENTITY FULL;
-ALTER TABLE public.payments REPLICA IDENTITY FULL;
-ALTER TABLE public.member_balances REPLICA IDENTITY FULL;
-ALTER TABLE public.meal_months REPLICA IDENTITY FULL;
-ALTER TABLE public.special_day_items REPLICA IDENTITY FULL;
-ALTER TABLE public.special_day_responses REPLICA IDENTITY FULL;
-ALTER TABLE public.profiles REPLICA IDENTITY FULL;
-ALTER TABLE public.app_settings REPLICA IDENTITY FULL;
-ALTER TABLE public.feast_day_config REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.app_settings;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.feast_day_config;
+DO $$ BEGIN
+  ALTER TABLE public.daily_meals REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.extra_meals REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.payments REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.member_balances REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.meal_months REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.special_day_items REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.special_day_responses REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.profiles REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.app_settings REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.feast_day_config REPLICA IDENTITY FULL;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.app_settings;
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.feast_day_config;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ===== Migration: 20260520173858_63f83899-ae82-451c-b573-53ff7e3ba79b.sql =====
 UPDATE public.master_admin_credentials
@@ -1062,6 +1147,7 @@ SELECT cron.schedule(
 -- Add delete policy for payments table to allow managers and admins to delete entries.
 DROP POLICY IF EXISTS "Managers can delete payments" ON public.payments;
 
+DROP POLICY IF EXISTS "Managers can delete payments" ON public.payments;
 CREATE POLICY "Managers can delete payments" ON public.payments 
 FOR DELETE TO authenticated 
 USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
