@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SMC Meal Mate</string>
+    <string name="title_activity_main">SMC Meal Mate</string>
+    <string name="package_name">com.smc.mealmate</string>
+    <string name="custom_url_scheme">com.smc.mealmate</string>
+</resources>
