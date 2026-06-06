@@ -73,8 +73,8 @@ export async function generateMealPdf(
   let sumRows = '';
   for (const item of sumItems) {
     sumRows += `<tr>
-      <td colspan="${totalCols - 1}" class="sum-label">${esc(item.label)}</td>
       <td class="sum-val">${item.value}</td>
+      <td class="sum-label">${esc(item.label)}</td>
     </tr>`;
   }
 
@@ -203,7 +203,7 @@ export async function generateMealPdf(
 
   /* ── Summary table ── */
   .sum-tbl {
-    width: 100%;
+    width: auto;
     border-collapse: collapse;
     margin-top: 3px;
   }
@@ -212,16 +212,19 @@ export async function generateMealPdf(
     font-size: calc(${fontSize} + 0.5pt);
     padding: 2px 5px;
   }
-  .sum-label {
-    background: #FFF9C4;
-    font-weight: 600;
-    text-align: right;
-  }
   .sum-val {
-    background: #FFF9C4;
+    background: #1B5E20;
+    color: #fff;
     font-weight: 700;
     text-align: center;
     min-width: 30px;
+    font-size: calc(${fontSize} + 1pt);
+  }
+  .sum-label {
+    background: #FFF9C4;
+    font-weight: 600;
+    text-align: left;
+    min-width: 160px;
   }
 
   /* ── Print button (screen only) ── */
