@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://fmleplqssxndaynmxhjr.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtbGVwbHFzc3huZGF5bm14aGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjEzNTEsImV4cCI6MjA5MDAzNzM1MX0.pNIo5AR3w1spZJmNT_FI1OWLacRZfX9akSELG5YByGU";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_JnI0zCzVwUcwIHL1wCmGlQ_MybljlUP";
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.warn(
