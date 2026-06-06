@@ -680,54 +680,13 @@ export default function Auth() {
             </div>
 
             {/* Right/Illustration Column */}
-            <div className="hidden lg:flex lg:col-span-7 flex-col justify-between glass-card border border-primary/10 rounded-3xl p-8 shadow-2xl relative overflow-hidden group min-h-[600px] w-full self-stretch">
-              {/* Light effect overlay */}
-              <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/15 transition-all duration-500" />
-              
-              {/* Illustration Header */}
-              <div className="relative z-10 space-y-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                  <Sparkles className="h-3.5 w-3.5 animate-glow-pulse" /> SMC Meal Mate v2.0
-                </span>
-                <h2 className="text-3xl font-extrabold font-bengali gradient-text-hero">
-                  স্মার্ট মিল ম্যানেজমেন্ট
-                </h2>
-                <p className="text-sm text-muted-foreground font-bengali">
-                  সাতক্ষীরা মেডিকেল কলেজের শিক্ষার্থীদের জন্য তৈরি আধুনিক মিল হিসাবনিকাশ প্ল্যাটফর্ম।
-                </p>
-              </div>
-
-              {/* Main Image Illustration */}
-              <div className="relative my-6 flex items-center justify-center z-10 max-h-[320px]">
-                <div className="relative rounded-2xl overflow-hidden border border-border/40 bg-background/20 p-2 backdrop-blur-md shadow-2xl shadow-primary/10 group-hover:scale-[1.02] group-hover:rotate-1 transition-all duration-500 ease-out">
-                  <img 
-                    src="/dining.png" 
-                    alt="SMC Dining Illustration" 
-                    className="max-h-[280px] w-auto object-cover rounded-xl"
-                  />
-                  {/* Subtle glass reflection effect */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Features/Bullets */}
-              <div className="relative z-10 grid grid-cols-1 gap-3.5 mt-auto">
-                {[
-                  { title: 'ওয়ান-ক্লিক মিল কন্ট্রোল', desc: 'সহজেই লাঞ্চ ও ডিনার মিল অন/অফ করুন যেকোনো স্থান থেকে।' },
-                  { title: 'টেলিগ্রাম নোটিফিকেশন সিস্টেম', desc: 'রাত ৯:০০, ৯:৩০ এবং ৯:৫৫ মিনিটে অটোমেটেড রিমাইন্ডার মেসেজ।' },
-                  { title: 'ডিজিটাল হিসাব ও এক্সেল শিট', desc: 'কোনো খাতা-কলমের ঝামেলা ছাড়াই মুহূর্তে ডাউনলোড করুন নির্ভুল হিসাব।' }
-                ].map((f, i) => (
-                  <div key={i} className="flex gap-3 items-start p-3 rounded-2xl hover:bg-primary/5 transition-colors duration-300">
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 mt-0.5">
-                      <Check className="h-3.5 w-3.5 stroke-[3] text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold font-bengali text-foreground">{f.title}</h4>
-                      <p className="text-xs text-muted-foreground font-bengali mt-0.5">{f.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="hidden lg:block lg:col-span-7 rounded-3xl overflow-hidden shadow-2xl relative border border-primary/10 self-stretch min-h-[600px] group">
+              <img 
+                src="/dining.png" 
+                alt="SMC Dining Background" 
+                className="absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/20 via-transparent to-transparent pointer-events-none" />
             </div>
 
           </div>
