@@ -591,7 +591,7 @@ WHERE dinner_extra_option IS NOT NULL
   AND (dinner_extra_option LIKE '%egg_instead_of_fish%'
     OR dinner_extra_option LIKE '%egg_instead_of_chicken%'
     OR dinner_extra_option LIKE '%egg_fry%'
-    OR dinner_extra_option LIKE '%egg_poach%')
+    OR dinner_extra_option LIKE '%egg_poach%');
 
 
 -- ===== Migration: 20260329103833_453f0295-10a1-4ef2-9a8e-544f8dc211ef.sql =====
