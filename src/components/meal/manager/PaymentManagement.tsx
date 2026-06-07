@@ -46,6 +46,7 @@ export default function PaymentManagement() {
   const [editingMealCount, setEditingMealCount] = useState(false);
   const [mealCountInput, setMealCountInput] = useState('');
   const [pendingMealSave, setPendingMealSave] = useState<{ userId: string; oldCount: number; newCount: number; name: string } | null>(null);
+  const [pendingDeletePaymentId, setPendingDeletePaymentId] = useState<string | null>(null);
   const [methodFilter, setMethodFilter] = useState<'all' | 'cash' | 'bikash'>('all');
 
   // Payment history filter
@@ -274,17 +275,20 @@ export default function PaymentManagement() {
     }
   };
 
-  const deletePayment = async (paymentId: string) => {
-    const confirmDelete = window.confirm("আপনি কি নিশ্চিতভাবে এই পেমেন্টটি ডিলিট করতে চান?");
-    if (!confirmDelete) return;
-    
-    const { error } = await supabase.from('payments').delete().eq('id', paymentId);
+  const handleDeletePaymentClick = (paymentId: string) => {
+    setPendingDeletePaymentId(paymentId);
+  };
+
+  const confirmDeletePayment = async () => {
+    if (!pendingDeletePaymentId) return;
+    const { error } = await supabase.from('payments').delete().eq('id', pendingDeletePaymentId);
     if (error) {
       toast.error('পেমেন্ট ডিলিট করতে সমস্যা হয়েছে: ' + error.message);
     } else {
       toast.success('পেমেন্টটি সফলভাবে ডিলিট করা হয়েছে');
       if (mealMonth) await Promise.all([fetchDataForMonth(mealMonth), fetchAllPayments()]);
     }
+    setPendingDeletePaymentId(null);
   };
 
 
@@ -828,7 +832,7 @@ export default function PaymentManagement() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => deletePayment(p.id)}
+                                onClick={() => handleDeletePaymentClick(p.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -875,6 +879,21 @@ export default function PaymentManagement() {
           <AlertDialogFooter>
             <AlertDialogCancel className="font-bengali">বাতিল</AlertDialogCancel>
             <AlertDialogAction className="font-bengali" onClick={saveMealCountOverride}>সেভ করুন</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pendingDeletePaymentId} onOpenChange={(open) => { if (!open) setPendingDeletePaymentId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-bengali">পেমেন্ট ডিলিট নিশ্চিত করুন</AlertDialogTitle>
+            <AlertDialogDescription className="font-bengali">
+              আপনি কি নিশ্চিতভাবে এই পেমেন্টটি ডিলিট করতে চান? এই কাজটি আর ফিরিয়ে আনা যাবে না।
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="font-bengali">বাতিল</AlertDialogCancel>
+            <AlertDialogAction className="font-bengali bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={confirmDeletePayment}>ডিলিট করুন</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
