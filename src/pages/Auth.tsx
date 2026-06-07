@@ -692,7 +692,7 @@ export default function Auth() {
           onClick={async () => {
             toast.info('ডাউনলোড হচ্ছে...');
             try {
-              const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co"}/functions/v1/download-meal-sheet?gender=male`);
+              const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://fmleplqssxndaynmxhjr.supabase.co"}/functions/v1/download-meal-sheet?gender=male`);
               if (!res.ok) throw new Error('No data');
               const { profiles, meals, extraMeals, date } = await res.json();
               const dayOfWeek = new Date(date).getDay();
@@ -709,7 +709,7 @@ export default function Auth() {
           onClick={async () => {
             toast.info('ডাউনলোড হচ্ছে...');
             try {
-              const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co"}/functions/v1/download-meal-sheet?gender=female`);
+              const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://fmleplqssxndaynmxhjr.supabase.co"}/functions/v1/download-meal-sheet?gender=female`);
               if (!res.ok) throw new Error('No data');
               const { profiles, meals, extraMeals, date } = await res.json();
               const dayOfWeek = new Date(date).getDay();
