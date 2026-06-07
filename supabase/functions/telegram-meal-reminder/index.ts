@@ -19,6 +19,15 @@ const EXTRA_LABEL_MAP: Record<string, string> = {
   egg_poach: 'ডিম পোচ',
 };
 
+function getFormattedDate(date: Date): string {
+  const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  const dayName = days[date.getDay()];
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year} (${dayName})`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -160,17 +169,8 @@ Deno.serve(async (req) => {
       const meal = tomorrowMap.get(p.user_id);
       const todayMeal = todayMap.get(p.user_id);
       const extra = extraMap.get(p.user_id);
-      const rollLabel = p.roll_number || '—';
-
-      if (meal) {
-        updatedCount++;
-        const lunchCount = (meal.lunch ? 1 : 0) + (extra?.extraLunch || 0);
-        const dinnerCount = (meal.dinner ? 1 : 0) + (extra?.extraDinner || 0);
-        totalLunch += lunchCount;
-        totalDinner += dinnerCount;
-
-        const lunchStr = lunchCount > 1 ? `${lunchCount}L` : lunchCount === 1 ? 'L✅' : 'L❌';
-        const dinnerStr = dinnerCount > 1 ? `${dinnerCount}D` : dinnerCount === 1 ? 'D✅' : 'D❌';
+         const lunchStr = lunchCount > 1 ? `☀️ L: ${lunchCount}` : lunchCount === 1 ? '☀️ L: ✅' : '☀️ L: ❌';
+        const dinnerStr = dinnerCount > 1 ? `🌙 D: ${dinnerCount}` : dinnerCount === 1 ? '🌙 D: ✅' : '🌙 D: ❌';
 
         const rawExtraKeys = (meal.lunch_extra_option || '')
           .split(',').map((v: string) => v.trim()).filter(Boolean);
@@ -186,12 +186,12 @@ Deno.serve(async (req) => {
         const specialLabels = userSpecialMap.get(p.user_id) || [];
         const countedLabels = Array.from(keyCounts.entries()).map(([key, count]) => {
           const label = EXTRA_LABEL_MAP[key] || key;
-          return count > 1 ? `${count}${label}` : `1${label}`;
+          return count > 1 ? `${count}টি ${label}` : `${label}`;
         });
         const allExtra = [...countedLabels, ...specialLabels];
-        const extraText = allExtra.length > 0 ? ` | ${allExtra.join(', ')}` : '';
+        const extraText = allExtra.length > 0 ? ` [🍖 ${allExtra.join(', ')}]` : '';
 
-        lines.push(`${idx + 1}. [${rollLabel}] ${p.full_name} — ${lunchStr} ${dinnerStr}${extraText}`);
+        lines.push(`🟢 [${rollLabel}] ${p.full_name} ➔ ${lunchStr} | ${dinnerStr}${extraText}`);
       } else {
         notUpdatedCount++;
         let warning = '';
@@ -202,31 +202,45 @@ Deno.serve(async (req) => {
             const parts: string[] = [];
             if (todayLunchOff) parts.push('L');
             if (todayDinnerOff) parts.push('D');
-            warning = ` ⚠️আজ ${parts.join(',')} OFF ছিল!`;
+            warning = ` ⚠️ আজ ${parts.join(',')} OFF ছিল!`;
             warnings.push(p.full_name);
           }
         }
-        lines.push(`${idx + 1}. [${rollLabel}] ${p.full_name} — 🔴 আপডেট দেয়নি${warning}`);
+        lines.push(`🔴 [${rollLabel}] ${p.full_name} ➔ আপডেট দেয়নি${warning}`);
       }
     });
 
-    let message = `🍽️ <b>মিল স্ট্যাটাস রিপোর্ট</b>\n`;
-    message += `📅 তারিখ: ${tomorrowStr}\n`;
-    message += `🕐 সময়: ${timeStr} | ⏳ বাকি: ${remainingMinutes} মিনিট\n\n`;
-    message += `📊 ✅${updatedCount} জন আপডেট | ❌${notUpdatedCount} জন বাকি\n`;
-    message += `🍽️ মোট: L=${totalLunch} D=${totalDinner} = ${totalLunch + totalDinner}\n\n`;
-    message += `<b>👤 সদস্য তালিকা (Roll অনুযায়ী):</b>\n`;
+    let message = `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `🍽️  <b>মিল স্ট্যাটাস রিপোর্ট (Meal Status Report)</b>\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `📅 <b>তারিখ:</b> ${getFormattedDate(tomorrow)}\n`;
+    message += `🕐 <b>রিপোর্ট সময়:</b> ${timeStr} (⏳ বাকি: ${remainingMinutes} মিনিট)\n\n`;
+    message += `📊 <b>আপডেট স্থিতি:</b>\n`;
+    message += `   🟢 আপডেট দিয়েছেন: <b>${updatedCount} জন</b>\n`;
+    if (notUpdatedCount > 0) {
+      message += `   🔴 বাকি আছেন: <b>${notUpdatedCount} জন</b>\n`;
+    } else {
+      message += `   🎉 সবাই আপডেট দিয়েছেন!\n`;
+    }
+    message += `\n🍴 <b>মিল হিসেব:</b>\n`;
+    message += `   ☀️ লাঞ্চ (Lunch): <b>${totalLunch} টি</b>\n`;
+    message += `   🌙 ডিনার (Dinner): <b>${totalDinner} টি</b>\n`;
+    message += `   📈 মোট মিল: <b>${totalLunch + totalDinner} টি</b>\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `<b>👤 সদস্য তালিকা (Roll অনুযায়ী):</b>\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
     message += lines.join('\n');
 
     if (warnings.length > 0) {
-      message += `\n\n🚨 <b>সতর্কতা!</b> আজ OFF ছিল কিন্তু আগামীকাল আপডেট দেয়নি:\n`;
+      message += `\n\n🚨 <b>সতর্কতা! আজ OFF ছিল কিন্তু আগামীকালের আপডেট দেয়নি:</b>\n`;
       warnings.forEach((name) => { message += `⚠️ ${name}\n`; });
     }
 
+    message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     if (notUpdatedCount > 0) {
-      message += `\n⚠️ <i>মিল আপডেট দিন! রাত ১০টার পর বন্ধ।</i>`;
+      message += `⚠️ <i>মিল আপডেট দিন! রাত ১০টার পর বন্ধ হয়ে যাবে।</i>`;
     } else {
-      message += `\n🎉 <i>সবাই আপডেট দিয়েছে!</i>`;
+      message += `🎉 <i>সবাই সফলভাবে মিল আপডেট সম্পন্ন করেছেন!</i>`;
     }
 
     const sendMessage = async (targetChatId: string) => {
