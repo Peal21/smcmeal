@@ -106,20 +106,6 @@ Deno.serve(async (req) => {
         lunch_extra_option: sourceMeal.lunch_extra_option,
         dinner_extra_option: sourceMeal.dinner_extra_option,
       });
-    } else if (!existingTarget.lunch && !existingTarget.dinner && !existingTarget.lunch_extra_option && !existingTarget.dinner_extra_option) {
-      if (carriedLunch || carriedDinner) {
-        rowsToUpdate.push({
-          id: existingTarget.id,
-          data: {
-            lunch: carriedLunch,
-            dinner: carriedDinner,
-            lunch_extra_option: sourceMeal.lunch_extra_option,
-            dinner_extra_option: sourceMeal.dinner_extra_option,
-          },
-        });
-      } else {
-        skippedCount++;
-      }
     } else {
       skippedCount++;
     }

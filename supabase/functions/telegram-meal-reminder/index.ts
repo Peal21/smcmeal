@@ -62,10 +62,13 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    const todayStr = now.toISOString().split('T')[0];
+    // Use Bangladesh time (UTC+6) for all date calculations to match frontend
+    const bdNow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+    const todayStr = bdNow.toISOString().split('T')[0];
+    const bdTomorrow = new Date(bdNow.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = bdTomorrow.toISOString().split('T')[0];
+    // Create a proper Date object for tomorrow in BD timezone for display
+    const tomorrow = new Date(tomorrowStr + 'T00:00:00');
 
     const { data: profiles } = await supabase
       .from('profiles')
@@ -152,11 +155,15 @@ Deno.serve(async (req) => {
       }
     });
 
-    const bdTime = new Date(now.getTime() + (6 * 60 * 60 * 1000));
-    const hours = bdTime.getUTCHours();
-    const minutes = bdTime.getUTCMinutes();
+    const hours = bdNow.getUTCHours();
+    const minutes = bdNow.getUTCMinutes();
     const timeStr = `${hours}:${String(minutes).padStart(2, '0')}`;
     const remainingMinutes = Math.max(0, (22 * 60) - (hours * 60 + minutes));
+
+    const extraCounts: Record<string, number> = {};
+    Object.keys(EXTRA_LABEL_MAP).forEach((key) => {
+      extraCounts[key] = 0;
+    });
 
     const lines: string[] = [];
     let updatedCount = 0;
@@ -186,6 +193,12 @@ Deno.serve(async (req) => {
         const extraMealKeys = extraOptionMap.get(p.user_id) || [];
         const allRawKeys = [...rawExtraKeys, ...extraMealKeys];
         const displayKeys = isFeastDay ? allRawKeys : allRawKeys.filter((k: string) => k !== 'chicken');
+
+        displayKeys.forEach((key: string) => {
+          if (extraCounts[key] !== undefined) {
+            extraCounts[key] += 1;
+          }
+        });
 
         const keyCounts = new Map<string, number>();
         for (const key of displayKeys) {
@@ -234,8 +247,35 @@ Deno.serve(async (req) => {
     message += `\n🍴 <b>মিল হিসেব:</b>\n`;
     message += `   ☀️ লাঞ্চ (Lunch): <b>${totalLunch} টি</b>\n`;
     message += `   🌙 ডিনার (Dinner): <b>${totalDinner} টি</b>\n`;
-    message += `   📈 মোট মিল: <b>${totalLunch + totalDinner} টি</b>\n\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `   📈 মোট মিল: <b>${totalLunch + totalDinner} টি</b>\n`;
+
+    const EXTRA_SUMMARY_ORDER = [
+      'beef',
+      'mutton',
+      'chicken',
+      'egg_fish_fry',
+      'egg_fish_poach',
+      'egg_chicken_fry',
+      'egg_chicken_poach',
+      'egg_instead_of_fish',
+      'egg_instead_of_chicken',
+      'egg_fry',
+      'egg_poach',
+    ];
+
+    let extraLines = '';
+    EXTRA_SUMMARY_ORDER.forEach((key) => {
+      const count = extraCounts[key] || 0;
+      if (count > 0) {
+        const label = EXTRA_LABEL_MAP[key];
+        extraLines += `   🥩 ${label}: <b>${count} টি</b>\n`;
+      }
+    });
+
+    if (extraLines) {
+      message += `\n🍖 <b>বিবিধ হিসেব (Extra Options):</b>\n` + extraLines;
+    }
+    message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     message += `<b>👤 সদস্য তালিকা (Roll অনুযায়ী):</b>\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
     message += lines.join('\n');
