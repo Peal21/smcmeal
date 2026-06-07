@@ -90,7 +90,7 @@ export async function generatePaymentExcel(
   ws.pageSetup.printTitlesRow = '1:4';
 
   let serial = 1;
-  let grandTotalDue = 0, grandTotalPaid = 0, grandTotalCash = 0, grandTotalBikash = 0;
+  let grandTotalDue = 0, grandTotalPaid = 0, grandTotalCash = 0, grandTotalBikash = 0, grandTotalRemaining = 0;
 
   for (const [year, list] of grouped.entries()) {
     const batchRow = ws.addRow([`${YEAR_LABELS[year]} Batch`]);
@@ -108,6 +108,10 @@ export async function generatePaymentExcel(
       const bikash = paidBikashMap?.get(m.user_id) ?? 0;
       const balance = due - paid;
       const status = balance <= 0 ? 'Paid' : 'Due';
+
+      if (balance > 0) {
+        grandTotalRemaining += balance;
+      }
 
       grandTotalDue += due;
       grandTotalPaid += paid;
@@ -147,7 +151,7 @@ export async function generatePaymentExcel(
   addSum('Total Cash Collected', `৳${grandTotalCash.toFixed(0)}`, 'FF2E7D32');
   addSum('Total Bikash Collected', `৳${grandTotalBikash.toFixed(0)}`, 'FFE91E63');
   addSum('Total Paid (Cash + Bikash)', `৳${grandTotalPaid.toFixed(0)}`);
-  addSum('Total Remaining', `৳${(grandTotalDue - grandTotalPaid).toFixed(0)}`, 'FFC62828');
+  addSum('Total Remaining', `৳${grandTotalRemaining.toFixed(0)}`, 'FFC62828');
 
   ws.pageSetup.printArea = `A1:J${ws.rowCount}`;
 

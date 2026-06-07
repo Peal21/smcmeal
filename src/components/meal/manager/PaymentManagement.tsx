@@ -201,14 +201,21 @@ export default function PaymentManagement() {
 
   const summary = useMemo(() => {
     let totalDueAll = 0, totalPaidAll = 0, totalCash = 0, totalBikash = 0;
+    let totalDuesOnly = 0;
     members.forEach(m => {
       const meals = effectiveMeals(m.user_id);
-      totalDueAll += meals * mealRate + extraCharge;
-      totalPaidAll += paidMap.get(m.user_id) || 0;
+      const userDue = meals * mealRate + extraCharge;
+      const userPaid = paidMap.get(m.user_id) || 0;
+      const remaining = userDue - userPaid;
+      if (remaining > 0) {
+        totalDuesOnly += remaining;
+      }
+      totalDueAll += userDue;
+      totalPaidAll += userPaid;
       totalCash += paidCashMap.get(m.user_id) || 0;
       totalBikash += paidBikashMap.get(m.user_id) || 0;
     });
-    return { totalDue: totalDueAll, totalPaid: totalPaidAll, totalRemaining: totalDueAll - totalPaidAll, totalCash, totalBikash };
+    return { totalDue: totalDueAll, totalPaid: totalPaidAll, totalRemaining: totalDuesOnly, totalCash, totalBikash };
   }, [members, mealCountMap, paidMap, paidCashMap, paidBikashMap, mealRate, minMeals, extraCharge]);
 
   // Payment for selected detail member
