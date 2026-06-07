@@ -35,24 +35,32 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Check user exists via admin API
+      // Check user exists via admin API (listUsers to avoid recovery link generation/rate limits)
       let userId: string;
       try {
-        const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-          type: "recovery",
-          email,
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+          perPage: 1000,
         });
-        if (error || !data?.user) {
+        if (error || !data?.users) {
+          return new Response(
+            JSON.stringify({ error: "ইউজারদের তালিকা পেতে সমস্যা হয়েছে" }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+        const user = data.users.find(
+          (u: any) => u.email?.toLowerCase() === email
+        );
+        if (!user) {
           return new Response(
             JSON.stringify({ error: "এই ইমেইলে কোনো অ্যাকাউন্ট নেই" }),
             { status: 404, headers: corsHeaders }
           );
         }
-        userId = data.user.id;
-      } catch {
+        userId = user.id;
+      } catch (e: any) {
         return new Response(
-          JSON.stringify({ error: "এই ইমেইলে কোনো অ্যাকাউন্ট নেই" }),
-          { status: 404, headers: corsHeaders }
+          JSON.stringify({ error: "ইউজার যাচাই করতে সমস্যা হয়েছে" }),
+          { status: 500, headers: corsHeaders }
         );
       }
 

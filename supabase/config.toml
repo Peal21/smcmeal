@@ -5,3 +5,13 @@ verify_jwt = false
 
 [functions.telegram-meal-reminder]
 verify_jwt = false
+
+[functions.password-reset-otp]
+verify_jwt = false
+
+[functions.download-meal-sheet]
+verify_jwt = false
+
+[functions.auto-carry-meals]
+verify_jwt = false
+
