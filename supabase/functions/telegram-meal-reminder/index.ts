@@ -169,7 +169,16 @@ Deno.serve(async (req) => {
       const meal = tomorrowMap.get(p.user_id);
       const todayMeal = todayMap.get(p.user_id);
       const extra = extraMap.get(p.user_id);
-         const lunchStr = lunchCount > 1 ? `☀️ L: ${lunchCount}` : lunchCount === 1 ? '☀️ L: ✅' : '☀️ L: ❌';
+      const rollLabel = p.roll_number || '—';
+
+      if (meal) {
+        updatedCount++;
+        const lunchCount = (meal.lunch ? 1 : 0) + (extra?.extraLunch || 0);
+        const dinnerCount = (meal.dinner ? 1 : 0) + (extra?.extraDinner || 0);
+        totalLunch += lunchCount;
+        totalDinner += dinnerCount;
+
+        const lunchStr = lunchCount > 1 ? `☀️ L: ${lunchCount}` : lunchCount === 1 ? '☀️ L: ✅' : '☀️ L: ❌';
         const dinnerStr = dinnerCount > 1 ? `🌙 D: ${dinnerCount}` : dinnerCount === 1 ? '🌙 D: ✅' : '🌙 D: ❌';
 
         const rawExtraKeys = (meal.lunch_extra_option || '')
