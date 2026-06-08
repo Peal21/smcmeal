@@ -95,19 +95,27 @@ Deno.serve(async (req) => {
     const carriedLunch = sourceMeal.lunch_off_today_only ? true : sourceMeal.lunch;
     const carriedDinner = sourceMeal.dinner_off_today_only ? true : sourceMeal.dinner;
 
+    const carriedData = {
+      lunch: carriedLunch,
+      dinner: carriedDinner,
+      lunch_extra_option: sourceMeal.lunch_extra_option,
+      dinner_extra_option: sourceMeal.dinner_extra_option,
+      // Always reset off_today_only flags for the new day
+      lunch_off_today_only: false,
+      dinner_off_today_only: false,
+    };
+
     const existingTarget = existingTargetMap.get(u.user_id);
 
     if (!existingTarget) {
       rowsToInsert.push({
         user_id: u.user_id,
         meal_date: targetDate,
-        lunch: carriedLunch,
-        dinner: carriedDinner,
-        lunch_extra_option: sourceMeal.lunch_extra_option,
-        dinner_extra_option: sourceMeal.dinner_extra_option,
+        ...carriedData,
       });
     } else {
-      skippedCount++;
+      // Update existing target row with carried data
+      rowsToUpdate.push({ id: existingTarget.id, data: carriedData });
     }
   }
 
