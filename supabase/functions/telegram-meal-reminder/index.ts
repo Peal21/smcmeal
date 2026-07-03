@@ -155,39 +155,47 @@ Deno.serve(async (req) => {
       }
     });
 
-    const hours = bdNow.getUTCHours();
-    const minutes = bdNow.getUTCMinutes();
-    const timeStr = `${hours}:${String(minutes).padStart(2, '0')}`;
-    const remainingMinutes = Math.max(0, (22 * 60) - (hours * 60 + minutes));
-
     const extraCounts: Record<string, number> = {};
     Object.keys(EXTRA_LABEL_MAP).forEach((key) => {
       extraCounts[key] = 0;
     });
 
-    const lines: string[] = [];
+    const onLines: string[] = [];
+    const offLines: string[] = [];
     let updatedCount = 0;
     let notUpdatedCount = 0;
-    const warnings: string[] = [];
     let totalLunch = 0;
     let totalDinner = 0;
+    let totalExtraLunch = 0;
+    let totalExtraDinner = 0;
 
     profiles.forEach((p: any, idx: number) => {
       const meal = tomorrowMap.get(p.user_id);
       const todayMeal = todayMap.get(p.user_id);
       const extra = extraMap.get(p.user_id);
       const rollLabel = p.roll_number || '—';
+      const shortName = p.full_name.split(' ').slice(0, 2).join(' ');
 
       if (meal) {
         updatedCount++;
-        const lunchCount = (meal.lunch ? 1 : 0) + (extra?.extraLunch || 0);
-        const dinnerCount = (meal.dinner ? 1 : 0) + (extra?.extraDinner || 0);
+        const extraL = extra?.extraLunch || 0;
+        const extraD = extra?.extraDinner || 0;
+        const lunchCount = (meal.lunch ? 1 : 0) + extraL;
+        const dinnerCount = (meal.dinner ? 1 : 0) + extraD;
         totalLunch += lunchCount;
         totalDinner += dinnerCount;
+        totalExtraLunch += extraL;
+        totalExtraDinner += extraD;
 
-        const lunchStr = lunchCount > 1 ? `☀️ L: ${lunchCount}` : lunchCount === 1 ? '☀️ L: ✅' : '☀️ L: ❌';
-        const dinnerStr = dinnerCount > 1 ? `🌙 D: ${dinnerCount}` : dinnerCount === 1 ? '🌙 D: ✅' : '🌙 D: ❌';
+        // Lunch/Dinner status
+        const lunchIcon = meal.lunch ? '✅' : '❌';
+        const dinnerIcon = meal.dinner ? '✅' : '❌';
+        let lunchStr = lunchIcon;
+        if (extraL > 0) lunchStr += `+${extraL}`;
+        let dinnerStr = dinnerIcon;
+        if (extraD > 0) dinnerStr += `+${extraD}`;
 
+        // Extra options
         const rawExtraKeys = (meal.lunch_extra_option || '')
           .split(',').map((v: string) => v.trim()).filter(Boolean);
         const extraMealKeys = extraOptionMap.get(p.user_id) || [];
@@ -208,59 +216,87 @@ Deno.serve(async (req) => {
         const specialLabels = userSpecialMap.get(p.user_id) || [];
         const countedLabels = Array.from(keyCounts.entries()).map(([key, count]) => {
           const label = EXTRA_LABEL_MAP[key] || key;
-          return count > 1 ? `${count}টি ${label}` : `${label}`;
+          return count > 1 ? `${count}×${label}` : label;
         });
         const allExtra = [...countedLabels, ...specialLabels];
-        const extraText = allExtra.length > 0 ? ` [🍖 ${allExtra.join(', ')}]` : '';
+        const extraText = allExtra.length > 0 ? `\n   🍖 ${allExtra.join(' · ')}` : '';
 
-        lines.push(`🟢 [${rollLabel}] ${p.full_name} ➔ ${lunchStr} | ${dinnerStr}${extraText}`);
+        // Build member line
+        onLines.push(
+          `${String(idx + 1).padStart(2, ' ')}. <b>${shortName}</b> [${rollLabel}]\n   ☀️ L: ${lunchStr}  🌙 D: ${dinnerStr}${extraText}`
+        );
+
+        // Track who turned off a meal
+        if (!meal.lunch || !meal.dinner) {
+          const offParts: string[] = [];
+          if (!meal.lunch) offParts.push('লাঞ্চ ❌');
+          if (!meal.dinner) offParts.push('ডিনার ❌');
+          offLines.push(`⚡ <b>${shortName}</b> — ${offParts.join(', ')} বন্ধ করেছে`);
+        }
       } else {
         notUpdatedCount++;
-        let warning = '';
+        let extraInfo = '';
         if (todayMeal) {
-          const todayLunchOff = !todayMeal.lunch;
-          const todayDinnerOff = !todayMeal.dinner;
-          if (todayLunchOff || todayDinnerOff) {
-            const parts: string[] = [];
-            if (todayLunchOff) parts.push('L');
-            if (todayDinnerOff) parts.push('D');
-            warning = ` ⚠️ আজ ${parts.join(',')} OFF ছিল!`;
-            warnings.push(p.full_name);
+          const wasLunchOn = todayMeal.lunch;
+          const wasDinnerOn = todayMeal.dinner;
+          if (wasLunchOn && wasDinnerOn) {
+            extraInfo = ' (আজ L✅ D✅ ছিল)';
+          } else if (wasLunchOn) {
+            extraInfo = ' (আজ শুধু L✅ ছিল)';
+          } else if (wasDinnerOn) {
+            extraInfo = ' (আজ শুধু D✅ ছিল)';
+          } else {
+            extraInfo = ' (আজও বন্ধ ছিল)';
           }
         }
-        lines.push(`🔴 [${rollLabel}] ${p.full_name} ➔ আপডেট দেয়নি${warning}`);
+
+        onLines.push(
+          `${String(idx + 1).padStart(2, ' ')}. 🔴 <b>${shortName}</b> [${rollLabel}] — আপডেট দেয়নি${extraInfo}`
+        );
       }
     });
 
-    let message = `━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `🍽️  <b>মিল স্ট্যাটাস রিপোর্ট (Meal Status Report)</b>\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-    message += `📅 <b>তারিখ:</b> ${getFormattedDate(tomorrow)}\n`;
-    message += `🕐 <b>রিপোর্ট সময়:</b> ${timeStr} (⏳ বাকি: ${remainingMinutes} মিনিট)\n\n`;
-    message += `📊 <b>আপডেট স্থিতি:</b>\n`;
-    message += `   🟢 আপডেট দিয়েছেন: <b>${updatedCount} জন</b>\n`;
-    if (notUpdatedCount > 0) {
-      message += `   🔴 বাকি আছেন: <b>${notUpdatedCount} জন</b>\n`;
-    } else {
-      message += `   🎉 সবাই আপডেট দিয়েছেন!\n`;
-    }
-    message += `\n🍴 <b>মিল হিসেব:</b>\n`;
-    message += `   ☀️ লাঞ্চ (Lunch): <b>${totalLunch} টি</b>\n`;
-    message += `   🌙 ডিনার (Dinner): <b>${totalDinner} টি</b>\n`;
-    message += `   📈 মোট মিল: <b>${totalLunch + totalDinner} টি</b>\n`;
+    // ──── Build the beautiful message ────
 
+    const hours = bdNow.getUTCHours();
+    const minutes = bdNow.getUTCMinutes();
+    const timeStr = `${hours}:${String(minutes).padStart(2, '0')}`;
+    const remainingMinutes = Math.max(0, (22 * 60) - (hours * 60 + minutes));
+
+    let message = '';
+    message += `╔══════════════════════════╗\n`;
+    message += `   🍽️ <b>মিল রিপোর্ট</b>\n`;
+    message += `╚══════════════════════════╝\n\n`;
+
+    message += `📅 <b>${getFormattedDate(tomorrow)}</b>\n`;
+    message += `🕐 রিপোর্ট: ${timeStr} | ⏳ বাকি: ${remainingMinutes} মিনিট\n`;
+    message += `─────────────────────\n\n`;
+
+    // ── Summary Stats ──
+    message += `📊 <b>সারসংক্ষেপ:</b>\n`;
+    message += `┌─────────────────────┐\n`;
+    message += `│ 🟢 আপডেট দিয়েছে: <b>${updatedCount}/${profiles.length} জন</b>\n`;
+    if (notUpdatedCount > 0) {
+      message += `│ 🔴 বাকি আছে: <b>${notUpdatedCount} জন</b>\n`;
+    }
+    message += `│\n`;
+    message += `│ ☀️ মোট লাঞ্চ: <b>${totalLunch} টি</b>\n`;
+    message += `│ 🌙 মোট ডিনার: <b>${totalDinner} টি</b>\n`;
+    message += `│ 📈 সর্বমোট: <b>${totalLunch + totalDinner} টি মিল</b>\n`;
+
+    if (totalExtraLunch > 0 || totalExtraDinner > 0) {
+      message += `│\n`;
+      message += `│ 🧾 অতিরিক্ত লাঞ্চ: <b>${totalExtraLunch}</b> | ডিনার: <b>${totalExtraDinner}</b>\n`;
+    }
+    message += `└─────────────────────┘\n`;
+
+    // ── Extra Options Summary ──
     const EXTRA_SUMMARY_ORDER = [
-      'beef',
-      'mutton',
-      'chicken',
-      'egg_fish_fry',
-      'egg_fish_poach',
-      'egg_chicken_fry',
-      'egg_chicken_poach',
-      'egg_instead_of_fish',
-      'egg_instead_of_chicken',
-      'egg_fry',
-      'egg_poach',
+      'beef', 'mutton', 'chicken',
+      'egg_fish_fry', 'egg_fish_poach',
+      'egg_chicken_fry', 'egg_chicken_poach',
+      'egg_instead_of_fish', 'egg_instead_of_chicken',
+      'egg_fry', 'egg_poach',
     ];
 
     let extraLines = '';
@@ -268,13 +304,11 @@ Deno.serve(async (req) => {
       const count = extraCounts[key] || 0;
       if (count > 0) {
         const label = EXTRA_LABEL_MAP[key];
-        extraLines += `   🥩 ${label}: <b>${count} টি</b>\n`;
+        extraLines += `   🥩 ${label}: <b>${count} জন</b>\n`;
       }
     });
 
     if (extraLines) {
-      message += `\n🍖 <b>বিবিধ হিসেব (Extra Options):</b>\n` + extraLines;
-    }
     message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     message += `<b>👤 সদস্য তালিকা (Roll অনুযায়ী):</b>\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n`;

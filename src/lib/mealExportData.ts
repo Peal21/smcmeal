@@ -66,6 +66,8 @@ export interface ExportMemberRow {
   lunch: string;
   dinner: string;
   extraText: string;
+  extraItemText: string;
+  otherExtraText: string;
 }
 
 export interface ExportBatch {
@@ -155,11 +157,31 @@ export function buildMealExportData(
       });
       const allExtraLabels = [...countedLabels, ...specialItems];
 
+      const beefCount = keyCounts.get('beef') || 0;
+      const muttonCount = keyCounts.get('mutton') || 0;
+      const goruText = beefCount > 0 ? (beefCount > 1 ? `${beefCount}গরু` : '1গরু') : '';
+      const khasiText = muttonCount > 0 ? (muttonCount > 1 ? `${muttonCount}খাসি` : '1খাসি') : '';
+      const extraItemText = [goruText, khasiText].filter(Boolean).join(' ');
+
+      const otherKeyCounts = new Map<string, number>();
+      for (const [key, count] of keyCounts.entries()) {
+        if (key !== 'beef' && key !== 'mutton') {
+          otherKeyCounts.set(key, count);
+        }
+      }
+      const otherCountedLabels = Array.from(otherKeyCounts.entries()).map(([key, count]) => {
+        const label = EXTRA_LABEL_MAP[key] || key;
+        return count > 1 ? `${count}${label}` : `1${label}`;
+      });
+      const otherExtraLabels = [...otherCountedLabels, ...specialItems];
+
       return {
         name: profile.full_name,
         lunch: lunchCount > 1 ? `${lunchCount}L` : lunchCount === 1 ? 'L' : '',
         dinner: dinnerCount > 1 ? `${dinnerCount}D` : dinnerCount === 1 ? 'D' : '',
         extraText: allExtraLabels.join(' '),
+        extraItemText,
+        otherExtraText: otherExtraLabels.join(' '),
       } satisfies ExportMemberRow;
     });
 

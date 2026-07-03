@@ -122,6 +122,35 @@ async function main() {
   // The logged-in user's email
   emailMap[authData.user.id] = email;
 
+  // ── Step 3.5: Clean target tables in new DB ─────────────────────────────
+  console.log('\n🧹 Clearing target tables in new DB via API to avoid unique/duplicate key conflicts...');
+  const tablesToDelete = [
+    'password_reset_codes',
+    'special_day_responses',
+    'member_balances',
+    'payments',
+    'extra_meals',
+    'daily_meals',
+    'user_roles',
+    'profiles',
+    'meal_months',
+    'carry_logs',
+    'feast_day_config',
+    'special_day_items',
+    'app_settings',
+    'admin_portal_credentials',
+    'master_admin_credentials',
+  ];
+
+  for (const table of tablesToDelete) {
+    const { error } = await newClient.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) {
+      console.warn(`  ⚠️  Failed to clear table ${table}: ${error.message}`);
+    } else {
+      console.log(`  ✅ Cleared table ${table}`);
+    }
+  }
+
   // ── Step 4: Create auth users in new DB ─────────────────────────────────────
   console.log('\n👤 Creating auth users in new DB...');
   let usersCreated = 0, usersSkipped = 0;
@@ -130,33 +159,31 @@ async function main() {
     const userId = profile.user_id;
     const userEmail = emailMap[userId] || `user-${userId.slice(0, 8)}@smcmeal.local`;
     
+    // Introduce a short delay to prevent socket connection reset under Bun's fetch
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
     // Try to create user with specific UUID via admin API
-    const res = await fetch(`${NEW_URL}/auth/v1/admin/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': NEW_SERVICE_ROLE,
-        'Authorization': `Bearer ${NEW_SERVICE_ROLE}`,
-      },
-      body: JSON.stringify({
-        id: userId,
-        email: userEmail,
-        password: 'TempPass@2024!',  // temporary password
-        email_confirm: true,
-        user_metadata: {
-          full_name: profile.full_name,
-          year: profile.year,
-          gender: profile.gender,
-          roll_number: profile.roll_number,
-        }
-      })
+    const { data: userData, error: userError } = await newClient.auth.admin.createUser({
+      id: userId,
+      email: userEmail,
+      password: 'TempPass@2024!',
+      email_confirm: true,
+      user_metadata: {
+        full_name: profile.full_name,
+        year: profile.year,
+        gender: profile.gender,
+        roll_number: profile.roll_number,
+      }
     });
 
-    const result = await res.json();
-    if (res.ok) {
+    if (!userError) {
       usersCreated++;
       process.stdout.write('.');
-    } else if (result.msg?.includes('already') || result.code === 'email_exists' || result.message?.includes('already')) {
+    } else if (
+      userError.message?.includes('already') ||
+      userError.message?.includes('exists') ||
+      userError.status === 422
+    ) {
       usersSkipped++;
       process.stdout.write('s');
     } else {

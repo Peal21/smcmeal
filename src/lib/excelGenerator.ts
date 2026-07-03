@@ -26,8 +26,8 @@ export async function generateMealExcel(
   );
 
   const bc = batches.length;
-  // Each batch = 4 cols: Name, L, D, Extra
-  const totalCols = 1 + bc * 4; // SL + batches
+  // Each batch = 5 cols: Name, L, D, Extra Item, Extra (others)
+  const totalCols = 1 + bc * 5; // SL + batches
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Meal Export', {
@@ -44,7 +44,8 @@ export async function generateMealExcel(
     cols.push({ width: 17 }); // Name
     cols.push({ width: 3 });  // L
     cols.push({ width: 3 });  // D
-    cols.push({ width: 22 }); // Extra (wider for special items)
+    cols.push({ width: 12 }); // Extra Item (Goru/Khasi)
+    cols.push({ width: 15 }); // Extra (wider for special items)
   }
   ws.columns = cols;
 
@@ -72,22 +73,22 @@ export async function generateMealExcel(
   r2.getCell(1).border = B;
   r2.height = 18;
 
-  // Row 3: Batch headers (each spans 4 cols)
+  // Row 3: Batch headers (each spans 5 cols)
   const h1Data: string[] = ['ক্র.নং'];
-  for (const b of batches) h1Data.push(YEAR_LABELS[b.year] || b.year, '', '', '');
+  for (const b of batches) h1Data.push(YEAR_LABELS[b.year] || b.year, '', '', '', '');
   const h1 = ws.addRow(h1Data);
   h1.height = 17;
   for (let i = 0; i < bc; i++) {
-    const sc = 2 + i * 4;
-    ws.mergeCells(h1.number, sc, h1.number, sc + 3);
+    const sc = 2 + i * 5;
+    ws.mergeCells(h1.number, sc, h1.number, sc + 4);
   }
   h1.getCell(1).font = { name: F, size: 8, bold: true, color: { argb: 'FFFFFFFF' } };
   h1.getCell(1).alignment = center;
   h1.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF37474F' } };
   h1.getCell(1).border = B;
   for (let i = 0; i < bc; i++) {
-    const sc = 2 + i * 4;
-    for (let c = sc; c <= sc + 3; c++) {
+    const sc = 2 + i * 5;
+    for (let c = sc; c <= sc + 4; c++) {
       const cell = h1.getCell(c);
       cell.font = { name: F, size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
       cell.alignment = center;
@@ -96,9 +97,9 @@ export async function generateMealExcel(
     }
   }
 
-  // Row 4: Sub-header (Name, L, D, বিবিধ)
+  // Row 4: Sub-header (Name, L, D, এক্সট্রা আইটেম, বিবিধ)
   const h2Data: string[] = [''];
-  for (let i = 0; i < bc; i++) h2Data.push('নাম', 'L', 'D', 'বিবিধ');
+  for (let i = 0; i < bc; i++) h2Data.push('নাম', 'L', 'D', 'এক্সট্রা আইটেম', 'বিবিধ');
   const h2 = ws.addRow(h2Data);
   h2.height = 14;
   h2.getCell(1).font = { name: F, size: 7, bold: true };
@@ -106,10 +107,10 @@ export async function generateMealExcel(
   h2.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
   h2.getCell(1).border = B;
   for (let i = 0; i < bc; i++) {
-    const sc = 2 + i * 4;
+    const sc = 2 + i * 5;
     const tint = BATCH_LIGHT[i % BATCH_LIGHT.length];
     const text = BATCH_COLORS[i % BATCH_COLORS.length];
-    for (let c = sc; c <= sc + 3; c++) {
+    for (let c = sc; c <= sc + 4; c++) {
       const cell = h2.getCell(c);
       cell.font = { name: F, size: 7.5, bold: true, color: { argb: text } };
       cell.alignment = center;
@@ -123,7 +124,13 @@ export async function generateMealExcel(
     const rd: (string | number)[] = [r + 1];
     for (const batch of batches) {
       const m = batch.members[r];
-      rd.push(m ? m.name : '', m ? m.lunch : '', m ? m.dinner : '', m ? m.extraText : '');
+      rd.push(
+        m ? m.name : '',
+        m ? m.lunch : '',
+        m ? m.dinner : '',
+        m ? m.extraItemText || '' : '',
+        m ? m.otherExtraText || '' : ''
+      );
     }
     const row = ws.addRow(rd);
     row.height = 13.5;
@@ -135,14 +142,14 @@ export async function generateMealExcel(
     if (isEven) row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAFAFA' } };
 
     for (let i = 0; i < bc; i++) {
-      const sc = 2 + i * 4;
+      const sc = 2 + i * 5;
       const tint = BATCH_LIGHT[i % BATCH_LIGHT.length];
-      for (let c = sc; c <= sc + 3; c++) {
+      for (let c = sc; c <= sc + 4; c++) {
         const cell = row.getCell(c);
         cell.border = B;
-        cell.font = { name: F, size: c === sc + 3 ? 7 : 8 };
+        cell.font = { name: F, size: c >= sc + 3 ? 7 : 8 };
         const colOffset = c - sc;
-        cell.alignment = colOffset === 0 || colOffset === 3 ? left : center;
+        cell.alignment = colOffset === 0 || colOffset === 4 ? left : center;
         if (isEven) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tint } };
       }
     }
