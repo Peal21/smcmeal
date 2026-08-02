@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import { playClickSound } from '@/lib/sounds';
 
 export default function AppHeader() {
-  const { profile, signOut, isManager, isAdmin, adminMode, enableAdminMode, disableAdminMode } = useAuth();
+  const { profile, signOut, isManager, isAdmin, isHistoricalManager, adminMode, enableAdminMode, disableAdminMode } = useAuth();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -32,8 +32,8 @@ export default function AppHeader() {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3 animate-fade-in-right">
-          {/* Quick toggle for privileged users (Manager / Admin) to switch views */}
-          {(isManager || isAdmin) && (
+          {/* Quick toggle for privileged users (Manager / Admin / Historical Manager) to switch views */}
+          {(isManager || isAdmin || isHistoricalManager) && (
             <Button
               variant="outline"
               size="sm"

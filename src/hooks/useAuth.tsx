@@ -21,6 +21,7 @@ interface AuthContextType {
   loading: boolean;
   isManager: boolean;
   isAdmin: boolean;
+  isHistoricalManager: boolean;
   adminMode: boolean;
   enableAdminMode: () => void;
   disableAdminMode: () => void;
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isHistoricalManager, setIsHistoricalManager] = useState(false);
   const [adminMode, setAdminMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('adminMode') === 'true' || sessionStorage.getItem('adminMode') === 'true';
@@ -62,16 +64,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfileAndRoles = useCallback(async (userId: string) => {
     try {
-      const [profileRes, rolesRes] = await Promise.all([
+      const [profileRes, rolesRes, monthsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('user_roles').select('role').eq('user_id', userId),
+        supabase.from('meal_months').select('id', { count: 'exact', head: true }).eq('manager_user_id', userId),
       ]);
       setProfile((profileRes.data as Profile) ?? null);
       setRoles((rolesRes.data || []).map((r: any) => r.role));
+      setIsHistoricalManager((monthsRes.count || 0) > 0);
     } catch (e) {
       console.error('Failed to fetch profile/roles', e);
       setProfile(null);
       setRoles([]);
+      setIsHistoricalManager(false);
     }
   }, []);
 
@@ -113,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setRoles([]);
+          setIsHistoricalManager(false);
           disableAdminMode();
         }
       }
@@ -137,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = roles.includes('super_admin');
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, roles, loading, isManager, isAdmin, adminMode, enableAdminMode, disableAdminMode, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, roles, loading, isManager, isAdmin, isHistoricalManager, adminMode, enableAdminMode, disableAdminMode, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
@@ -151,6 +157,7 @@ const fallbackAuthContext: AuthContextType = {
   loading: false,
   isManager: false,
   isAdmin: false,
+  isHistoricalManager: false,
   adminMode: false,
   enableAdminMode: () => undefined,
   disableAdminMode: () => undefined,

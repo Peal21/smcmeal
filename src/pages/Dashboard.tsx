@@ -29,7 +29,7 @@ function DashboardParticles() {
 }
 
 export default function Dashboard() {
-  const { isManager, isAdmin, adminMode } = useAuth();
+  const { isManager, isAdmin, isHistoricalManager, adminMode } = useAuth();
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -51,7 +51,7 @@ export default function Dashboard() {
       <div className="relative z-10">
         <AppHeader />
         <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 max-w-7xl page-enter">
-          {adminMode && (isManager || isAdmin) ? <ManagerDashboard /> : <StudentDashboard />}
+          {adminMode && (isManager || isAdmin || isHistoricalManager) ? <ManagerDashboard /> : <StudentDashboard />}
         </main>
       </div>
     </div>

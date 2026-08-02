@@ -34,7 +34,8 @@ type MealMonthRecord = {
 };
 
 export default function MonthSettings() {
-  const { user } = useAuth();
+  const { user, isManager, isAdmin, isHistoricalManager } = useAuth();
+  const isOnlyHistoricalManager = isHistoricalManager && !isManager && !isAdmin;
   const [allMonths, setAllMonths] = useState<MealMonthRecord[]>([]);
   const [selectedMonthId, setSelectedMonthId] = useState<string>('');
   const [manualMealRate, setManualMealRate] = useState('');
@@ -63,10 +64,11 @@ export default function MonthSettings() {
   const now = new Date();
 
   const fetchAllMonths = useCallback(async () => {
-    const { data } = await supabase
-      .from('meal_months')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let query = supabase.from('meal_months').select('*');
+    if (isOnlyHistoricalManager) {
+      query = query.eq('manager_user_id', user?.id);
+    }
+    const { data } = await query.order('created_at', { ascending: false });
     const months = (data || []) as MealMonthRecord[];
     setAllMonths(months);
 
@@ -76,7 +78,7 @@ export default function MonthSettings() {
       if (active) setSelectedMonthId(active.id);
     }
     return months;
-  }, [selectedMonthId]);
+  }, [selectedMonthId, isOnlyHistoricalManager, user]);
 
   const fetchMembers = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('user_id, full_name, roll_number').eq('is_active', true).order('full_name');
@@ -139,6 +141,10 @@ export default function MonthSettings() {
 
   const saveMonthSettings = async () => {
     if (!user || !selectedMonth) return;
+    if (startDate && endDate && startDate > endDate) {
+      toast.error('শুরুর তারিখ শেষের তারিখের চেয়ে পরে হতে পারে না!');
+      return;
+    }
     const expense = parseFloat(totalExpense) || 0;
     const manualRate = parseFloat(manualMealRate) || 0;
     const rate = manualRate > 0 ? manualRate : (totalMeals > 0 ? expense / totalMeals : 0);
@@ -162,6 +168,10 @@ export default function MonthSettings() {
   // Create a brand new month
   const createNewMonth = async () => {
     if (!user || !newMonthFormStart || !newMonthFormEnd) return;
+    if (newMonthFormStart && newMonthFormEnd && newMonthFormStart > newMonthFormEnd) {
+      toast.error('শুরুর তারিখ শেষের তারিখের চেয়ে পরে হতে পারে না!');
+      return;
+    }
     const parsedStart = new Date(newMonthFormStart);
 
     // Deactivate all
@@ -317,7 +327,12 @@ export default function MonthSettings() {
 
   const assignNextManager = async () => {
     if (!nextManager) return;
-    await supabase.from('user_roles').upsert({ user_id: nextManager, role: 'meal_manager' as any });
+    const { error: deleteErr } = await supabase.from('user_roles').delete().eq('role', 'meal_manager');
+    if (deleteErr) { toast.error('পুরোনো ম্যানেজার সরাতে ব্যর্থ: ' + deleteErr.message); return; }
+
+    const { error: insertErr } = await supabase.from('user_roles').insert({ user_id: nextManager, role: 'meal_manager' as any });
+    if (insertErr) { toast.error('নতুন ম্যানেজার নির্ধারণ ব্যর্থ: ' + insertErr.message); return; }
+
     toast.success('নতুন ম্যানেজার নির্ধারণ হয়েছে');
   };
 
@@ -418,9 +433,11 @@ export default function MonthSettings() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" className="font-bengali gap-1" onClick={() => setShowNewMonthForm(true)}>
-              <Plus className="h-4 w-4" /> নতুন মাস
-            </Button>
+            {!isOnlyHistoricalManager && (
+              <Button variant="outline" className="font-bengali gap-1" onClick={() => setShowNewMonthForm(true)}>
+                <Plus className="h-4 w-4" /> নতুন মাস
+              </Button>
+            )}
           </div>
 
           {selectedMonth && (
@@ -522,35 +539,37 @@ export default function MonthSettings() {
                 )}
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <Label className="font-bengali">পরবর্তী ম্যানেজার নির্ধারণ</Label>
-                  <Select value={nextManager} onValueChange={setNextManager}>
-                    <SelectTrigger><SelectValue placeholder="সদস্য নির্বাচন করুন" /></SelectTrigger>
-                    <SelectContent>
-                      {members.map(m => <SelectItem key={m.user_id} value={m.user_id}>{m.full_name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button onClick={assignNextManager} variant="secondary" className="w-full font-bengali gap-1" disabled={!nextManager}>
-                  <UserCheck className="h-4 w-4" /> ম্যানেজার নির্ধারণ করুন
-                </Button>
+              {!isOnlyHistoricalManager && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="font-bengali">পরবর্তী ম্যানেজার নির্ধারণ</Label>
+                    <Select value={nextManager} onValueChange={setNextManager}>
+                      <SelectTrigger><SelectValue placeholder="সদস্য নির্বাচন করুন" /></SelectTrigger>
+                      <SelectContent>
+                        {members.map(m => <SelectItem key={m.user_id} value={m.user_id}>{m.full_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={assignNextManager} variant="secondary" className="w-full font-bengali gap-1" disabled={!nextManager}>
+                    <UserCheck className="h-4 w-4" /> ম্যানেজার নির্ধারণ করুন
+                  </Button>
 
-                <Card className="border-dashed">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <UserPlus className="h-4 w-4 text-muted-foreground" />
-                        <Label className="font-bengali">সাইনআপ অপশন</Label>
+                  <Card className="border-dashed">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <UserPlus className="h-4 w-4 text-muted-foreground" />
+                          <Label className="font-bengali">সাইনআপ অপশন</Label>
+                        </div>
+                        <Switch checked={signupEnabled} onCheckedChange={toggleSignup} />
                       </div>
-                      <Switch checked={signupEnabled} onCheckedChange={toggleSignup} />
-                    </div>
-                    <p className="text-xs text-muted-foreground font-bengali mt-2">
-                      {signupEnabled ? 'চালু — রেজিস্ট্রেশন ট্যাব দেখাবে' : 'বন্ধ — রেজিস্ট্রেশন ট্যাব লুকানো'}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+                      <p className="text-xs text-muted-foreground font-bengali mt-2">
+                        {signupEnabled ? 'চালু — রেজিস্ট্রেশন ট্যাব দেখাবে' : 'বন্ধ — রেজিস্ট্রেশন ট্যাব লুকানো'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -572,101 +591,105 @@ export default function MonthSettings() {
         </CardContent>
       </Card>
 
-      {/* Telegram */}
-      <Card className="holo-card overflow-hidden animate-fade-in-up">
-        <CardHeader>
-          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
-            <Send className="h-5 w-5 text-primary animate-float" /> Telegram রিমাইন্ডার
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 max-w-xl">
-          <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 p-3">
-            <div>
-              <Label className="font-bengali text-sm">Telegram বট {telegramEnabled ? 'চালু' : 'বন্ধ'}</Label>
-              <p className="text-xs text-muted-foreground font-bengali mt-0.5">
-                বন্ধ করলে Telegram-এ কোনো রিমাইন্ডার যাবে না
+      {!isOnlyHistoricalManager && (
+        <>
+          {/* Telegram */}
+          <Card className="holo-card overflow-hidden animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+                <Send className="h-5 w-5 text-primary animate-float" /> Telegram রিমাইন্ডার
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-xl">
+              <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 p-3">
+                <div>
+                  <Label className="font-bengali text-sm">Telegram বট {telegramEnabled ? 'চালু' : 'বন্ধ'}</Label>
+                  <p className="text-xs text-muted-foreground font-bengali mt-0.5">
+                    বন্ধ করলে Telegram-এ কোনো রিমাইন্ডার যাবে না
+                  </p>
+                </div>
+                <Switch checked={telegramEnabled} onCheckedChange={toggleTelegramEnabled} />
+              </div>
+              <div>
+                <Label className="font-bengali">Telegram Group Chat ID</Label>
+                <Input value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} placeholder="-100xxxxxxxxxx" />
+                <p className="text-xs text-muted-foreground font-bengali mt-1">
+                  Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান। রাত ৯:০০, ৯:৩০ এবং ৯:৫৫ মিনিটে মিল আপডেটের রিমাইন্ডার যাবে।
+                </p>
+              </div>
+              <Button onClick={saveTelegramChatId} className="font-bengali gap-1">
+                <Send className="h-4 w-4" /> Chat ID সেভ করুন
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Meal Cutoff Time */}
+          <Card className="holo-card overflow-hidden animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+                <Clock className="h-5 w-5 text-primary animate-float" /> মিল আপডেট কাটঅফ টাইম
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-xl">
+              <p className="text-xs text-muted-foreground font-bengali">
+                এই সময়ের পর স্টুডেন্টরা মিল আপডেট করতে পারবে না। ডিফল্ট: রাত ১০:০০ PM
               </p>
-            </div>
-            <Switch checked={telegramEnabled} onCheckedChange={toggleTelegramEnabled} />
-          </div>
-          <div>
-            <Label className="font-bengali">Telegram Group Chat ID</Label>
-            <Input value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} placeholder="-100xxxxxxxxxx" />
-            <p className="text-xs text-muted-foreground font-bengali mt-1">
-              Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান। রাত ৯:০০, ৯:৩০ এবং ৯:৫৫ মিনিটে মিল আপডেটের রিমাইন্ডার যাবে।
-            </p>
-          </div>
-          <Button onClick={saveTelegramChatId} className="font-bengali gap-1">
-            <Send className="h-4 w-4" /> Chat ID সেভ করুন
-          </Button>
-        </CardContent>
-      </Card>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Label className="font-bengali">ঘণ্টা (0-23)</Label>
+                  <Input type="number" min="0" max="23" value={cutoffHour} onChange={e => setCutoffHour(parseInt(e.target.value) || 0)} />
+                </div>
+                <div className="flex-1">
+                  <Label className="font-bengali">মিনিট (0-59)</Label>
+                  <Input type="number" min="0" max="59" value={cutoffMinute} onChange={e => setCutoffMinute(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-secondary/50">
+                <p className="text-sm font-bengali">
+                  বর্তমান কাটঅফ: <span className="font-bold text-primary">{String(cutoffHour).padStart(2, '0')}:{String(cutoffMinute).padStart(2, '0')}</span>
+                  <span className="text-muted-foreground ml-2">
+                    ({cutoffHour >= 12 ? `${cutoffHour === 12 ? 12 : cutoffHour - 12}:${String(cutoffMinute).padStart(2, '0')} PM` : `${cutoffHour === 0 ? 12 : cutoffHour}:${String(cutoffMinute).padStart(2, '0')} AM`})
+                  </span>
+                </p>
+              </div>
+              <Button onClick={async () => {
+                const { error } = await supabase.from('app_settings' as any).update({
+                  meal_cutoff_hour: cutoffHour,
+                  meal_cutoff_minute: cutoffMinute,
+                  updated_at: new Date().toISOString(),
+                  updated_by: user?.id,
+                } as any).eq('id', 1);
+                if (error) toast.error(error.message);
+                else toast.success('কাটঅফ টাইম আপডেট হয়েছে');
+              }} className="font-bengali gap-1">
+                <Clock className="h-4 w-4" /> কাটঅফ টাইম সেভ করুন
+              </Button>
+            </CardContent>
+          </Card>
 
-      {/* Meal Cutoff Time */}
-      <Card className="holo-card overflow-hidden animate-fade-in-up">
-        <CardHeader>
-          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
-            <Clock className="h-5 w-5 text-primary animate-float" /> মিল আপডেট কাটঅফ টাইম
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 max-w-xl">
-          <p className="text-xs text-muted-foreground font-bengali">
-            এই সময়ের পর স্টুডেন্টরা মিল আপডেট করতে পারবে না। ডিফল্ট: রাত ১০:০০ PM
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <Label className="font-bengali">ঘণ্টা (0-23)</Label>
-              <Input type="number" min="0" max="23" value={cutoffHour} onChange={e => setCutoffHour(parseInt(e.target.value) || 0)} />
-            </div>
-            <div className="flex-1">
-              <Label className="font-bengali">মিনিট (0-59)</Label>
-              <Input type="number" min="0" max="59" value={cutoffMinute} onChange={e => setCutoffMinute(parseInt(e.target.value) || 0)} />
-            </div>
-          </div>
-          <div className="p-3 rounded-lg bg-secondary/50">
-            <p className="text-sm font-bengali">
-              বর্তমান কাটঅফ: <span className="font-bold text-primary">{String(cutoffHour).padStart(2, '0')}:{String(cutoffMinute).padStart(2, '0')}</span>
-              <span className="text-muted-foreground ml-2">
-                ({cutoffHour >= 12 ? `${cutoffHour === 12 ? 12 : cutoffHour - 12}:${String(cutoffMinute).padStart(2, '0')} PM` : `${cutoffHour === 0 ? 12 : cutoffHour}:${String(cutoffMinute).padStart(2, '0')} AM`})
-              </span>
-            </p>
-          </div>
-          <Button onClick={async () => {
-            const { error } = await supabase.from('app_settings' as any).update({
-              meal_cutoff_hour: cutoffHour,
-              meal_cutoff_minute: cutoffMinute,
-              updated_at: new Date().toISOString(),
-              updated_by: user?.id,
-            } as any).eq('id', 1);
-            if (error) toast.error(error.message);
-            else toast.success('কাটঅফ টাইম আপডেট হয়েছে');
-          }} className="font-bengali gap-1">
-            <Clock className="h-4 w-4" /> কাটঅফ টাইম সেভ করুন
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Admin Password */}
-      <Card className="holo-card overflow-hidden animate-fade-in-up">
-        <CardHeader>
-          <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
-            <ShieldCheck className="h-5 w-5 text-primary animate-glow-pulse" /> Dedicated Admin Password
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 max-w-xl">
-          <div>
-            <Label className="font-bengali">নতুন Password</Label>
-            <Input type="password" value={adminPortalPassword} onChange={(e) => setAdminPortalPassword(e.target.value)} placeholder="কমপক্ষে ৬ অক্ষর" />
-          </div>
-          <div>
-            <Label className="font-bengali">পুনরায় লিখুন</Label>
-            <Input type="password" value={adminPortalPasswordConfirm} onChange={(e) => setAdminPortalPasswordConfirm(e.target.value)} placeholder="একই পাসওয়ার্ড আবার" />
-          </div>
-          <Button onClick={updateAdminPortalPassword} className="font-bengali gap-1">
-            <ShieldCheck className="h-4 w-4" /> সেভ করুন
-          </Button>
-        </CardContent>
-      </Card>
+          {/* Admin Password */}
+          <Card className="holo-card overflow-hidden animate-fade-in-up">
+            <CardHeader>
+              <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
+                <ShieldCheck className="h-5 w-5 text-primary animate-glow-pulse" /> Dedicated Admin Password
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-xl">
+              <div>
+                <Label className="font-bengali">নতুন Password</Label>
+                <Input type="password" value={adminPortalPassword} onChange={(e) => setAdminPortalPassword(e.target.value)} placeholder="কমপক্ষে ৬ অক্ষর" />
+              </div>
+              <div>
+                <Label className="font-bengali">পুনরায় লিখুন</Label>
+                <Input type="password" value={adminPortalPasswordConfirm} onChange={(e) => setAdminPortalPasswordConfirm(e.target.value)} placeholder="একই পাসওয়ার্ড আবার" />
+              </div>
+              <Button onClick={updateAdminPortalPassword} className="font-bengali gap-1">
+                <ShieldCheck className="h-4 w-4" /> সেভ করুন
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* New Month Dialog */}
       <Dialog open={showNewMonthForm} onOpenChange={setShowNewMonthForm}>

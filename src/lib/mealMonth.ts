@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -44,8 +44,58 @@ export async function fetchResolvedMealMonth(referenceDate = new Date()) {
     return { data: null, error };
   }
 
+  const months = (data || []) as MealMonthRecord[];
+  let resolved = pickResolvedMealMonth(months, referenceDate);
+
+  if (resolved && resolved.is_active && resolved.end_date) {
+    const todayStr = format(referenceDate, 'yyyy-MM-dd');
+    if (todayStr > resolved.end_date) {
+      // The active month has ended. Let's calculate next month start and end dates.
+      const prevEnd = new Date(resolved.end_date + 'T00:00:00');
+      const nextStart = addDays(prevEnd, 1);
+      const nextMonthNum = nextStart.getMonth() + 1;
+      const nextYearNum = nextStart.getFullYear();
+      
+      const nextEnd = new Date(nextYearNum, nextMonthNum, 0);
+      const startStr = format(nextStart, 'yyyy-MM-dd');
+      const endStr = format(nextEnd, 'yyyy-MM-dd');
+
+      // Deactivate previous active month
+      await supabase.from('meal_months').update({ is_active: false } as any).eq('is_active', true);
+
+      // Create new active month
+      const { data: inserted, error: insertErr } = await supabase
+        .from('meal_months')
+        .insert({
+          month: nextMonthNum,
+          year: nextYearNum,
+          total_expense: 0,
+          meal_rate: 0,
+          extra_charge: 0,
+          is_active: true,
+          manager_user_id: resolved.manager_user_id,
+          start_date: startStr,
+          end_date: endStr,
+        } as any)
+        .select()
+        .maybeSingle();
+
+      if (!insertErr && inserted) {
+        resolved = inserted as MealMonthRecord;
+      } else {
+        const { data: refetched } = await supabase
+          .from('meal_months')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (refetched) {
+          resolved = pickResolvedMealMonth(refetched as MealMonthRecord[], referenceDate);
+        }
+      }
+    }
+  }
+
   return {
-    data: pickResolvedMealMonth((data || []) as MealMonthRecord[], referenceDate),
+    data: resolved,
     error: null,
   };
 }

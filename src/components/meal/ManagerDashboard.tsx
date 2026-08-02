@@ -13,6 +13,8 @@ import FeastDayManager from './manager/FeastDayManager';
 import { LayoutDashboard, Users, CreditCard, Settings, FileSpreadsheet, Plus, Calculator, RefreshCw, Star, Flame } from 'lucide-react';
 import { playClickSound } from '@/lib/sounds';
 
+import { useAuth } from '@/hooks/useAuth';
+
 const tabs = [
   { value: 'overview', label: 'সারসংক্ষেপ', icon: LayoutDashboard },
   { value: 'members', label: 'সদস্য', icon: Users },
@@ -27,11 +29,23 @@ const tabs = [
 ];
 
 export default function ManagerDashboard() {
+  const { isManager, isAdmin, isHistoricalManager } = useAuth();
+  const isOnlyHistoricalManager = isHistoricalManager && !isManager && !isAdmin;
+
+  const allowedTabs = tabs.filter(tab => {
+    if (isOnlyHistoricalManager) {
+      return ['billing', 'payments', 'export', 'settings'].includes(tab.value);
+    }
+    return true;
+  });
+
+  const defaultTab = isOnlyHistoricalManager ? 'billing' : 'overview';
+
   return (
-    <Tabs defaultValue="overview" onValueChange={() => playClickSound()} className="space-y-6 animate-fade-in">
+    <Tabs defaultValue={defaultTab} onValueChange={() => playClickSound()} className="space-y-6 animate-fade-in">
       <ScrollArea className="w-full pb-2">
         <TabsList className="inline-flex w-max gap-1.5 bg-muted/40 border border-border/40 backdrop-blur-md rounded-2xl p-1.5 shadow-md">
-          {tabs.map((tab, i) => (
+          {allowedTabs.map((tab, i) => (
             <TabsTrigger
               key={tab.value}
               value={tab.value}
@@ -45,16 +59,36 @@ export default function ManagerDashboard() {
         <ScrollBar orientation="horizontal" className="h-1" />
       </ScrollArea>
 
-      <TabsContent value="overview" className="animate-fade-in-up"><MealOverview /></TabsContent>
-      <TabsContent value="members" className="animate-fade-in-up"><MemberManagement /></TabsContent>
-      <TabsContent value="extra" className="animate-fade-in-up"><ExtraMealManager /></TabsContent>
-      <TabsContent value="feast" className="animate-fade-in-up"><FeastDayManager /></TabsContent>
-      <TabsContent value="billing" className="animate-fade-in-up"><BillingManagement /></TabsContent>
-      <TabsContent value="payments" className="animate-fade-in-up"><PaymentManagement /></TabsContent>
-      <TabsContent value="export" className="animate-fade-in-up"><ExcelExport /></TabsContent>
-      <TabsContent value="settings" className="animate-fade-in-up"><MonthSettings /></TabsContent>
-      <TabsContent value="special" className="animate-fade-in-up"><SpecialDayItemManager /></TabsContent>
-      <TabsContent value="carry" className="animate-fade-in-up"><AutoCarryControl /></TabsContent>
+      {allowedTabs.some(t => t.value === 'overview') && (
+        <TabsContent value="overview" className="animate-fade-in-up"><MealOverview /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'members') && (
+        <TabsContent value="members" className="animate-fade-in-up"><MemberManagement /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'extra') && (
+        <TabsContent value="extra" className="animate-fade-in-up"><ExtraMealManager /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'feast') && (
+        <TabsContent value="feast" className="animate-fade-in-up"><FeastDayManager /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'billing') && (
+        <TabsContent value="billing" className="animate-fade-in-up"><BillingManagement /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'payments') && (
+        <TabsContent value="payments" className="animate-fade-in-up"><PaymentManagement /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'export') && (
+        <TabsContent value="export" className="animate-fade-in-up"><ExcelExport /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'settings') && (
+        <TabsContent value="settings" className="animate-fade-in-up"><MonthSettings /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'special') && (
+        <TabsContent value="special" className="animate-fade-in-up"><SpecialDayItemManager /></TabsContent>
+      )}
+      {allowedTabs.some(t => t.value === 'carry') && (
+        <TabsContent value="carry" className="animate-fade-in-up"><AutoCarryControl /></TabsContent>
+      )}
     </Tabs>
   );
 }

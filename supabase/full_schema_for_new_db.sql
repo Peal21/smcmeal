@@ -176,6 +176,10 @@ DROP POLICY IF EXISTS "Managers can update extra meals" ON public.extra_meals;
 CREATE POLICY "Managers can update extra meals" ON public.extra_meals FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 DROP POLICY IF EXISTS "Managers can delete extra meals" ON public.extra_meals;
 CREATE POLICY "Managers can delete extra meals" ON public.extra_meals FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Users can update own extra meals" ON public.extra_meals;
+CREATE POLICY "Users can update own extra meals" ON public.extra_meals FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own extra meals" ON public.extra_meals;
+CREATE POLICY "Users can delete own extra meals" ON public.extra_meals FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 -- Payments policies
 DROP POLICY IF EXISTS "Users can view own payments" ON public.payments;

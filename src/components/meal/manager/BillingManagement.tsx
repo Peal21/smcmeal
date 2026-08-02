@@ -61,7 +61,8 @@ type PrevMonthData = {
 };
 
 export default function BillingManagement() {
-  const { isManager, isAdmin } = useAuth();
+  const { user, isManager, isAdmin, isHistoricalManager } = useAuth();
+  const isOnlyHistoricalManager = isHistoricalManager && !isManager && !isAdmin;
   const [members, setMembers] = useState<any[]>([]);
   const [meals, setMeals] = useState<any[]>([]);
   const [rawMeals, setRawMeals] = useState<any[]>([]);
@@ -92,11 +93,15 @@ export default function BillingManagement() {
   };
 
   const fetchAllMonths = useCallback(async () => {
-    const { data } = await supabase.from('meal_months').select('*');
+    let query = supabase.from('meal_months').select('*');
+    if (isOnlyHistoricalManager) {
+      query = query.eq('manager_user_id', user?.id);
+    }
+    const { data } = await query;
     const months = sortMonthsChronologically(data || []);
     setAllMonths(months);
     return months;
-  }, []);
+  }, [isOnlyHistoricalManager, user]);
 
   const fetchPrevMonthData = useCallback(async (currentMonth: any, months: any[]) => {
     // Find the month just before the current one chronologically (by start_date)

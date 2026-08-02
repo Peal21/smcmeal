@@ -22,7 +22,8 @@ import { sortByRoll } from '@/lib/sortMembers';
 const MONTH_QUERY_LIMIT = 10000;
 
 export default function PaymentManagement() {
-  const { user } = useAuth();
+  const { user, isManager, isAdmin, isHistoricalManager } = useAuth();
+  const isOnlyHistoricalManager = isHistoricalManager && !isManager && !isAdmin;
   const [members, setMembers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [dailyMeals, setDailyMeals] = useState<any[]>([]);
@@ -56,18 +57,33 @@ export default function PaymentManagement() {
   const [allPayments, setAllPayments] = useState<any[]>([]);
 
   const fetchAllPayments = useCallback(async () => {
-    const { data } = await supabase.from('payments').select('*').order('created_at', { ascending: false }).limit(MONTH_QUERY_LIMIT);
+    let query = supabase.from('payments').select('*').order('created_at', { ascending: false });
+    if (isOnlyHistoricalManager) {
+      const { data: mMonths } = await supabase.from('meal_months').select('id').eq('manager_user_id', user?.id);
+      const mIds = (mMonths || []).map(m => m.id);
+      if (mIds.length > 0) {
+        query = query.in('month_id', mIds);
+      } else {
+        setAllPayments([]);
+        return;
+      }
+    }
+    const { data } = await query.limit(MONTH_QUERY_LIMIT);
     setAllPayments(data || []);
-  }, []);
+  }, [isOnlyHistoricalManager, user]);
 
   useEffect(() => { fetchAllPayments(); }, [fetchAllPayments]);
 
   const fetchAllMonths = useCallback(async () => {
-    const { data } = await supabase.from('meal_months').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('meal_months').select('*');
+    if (isOnlyHistoricalManager) {
+      query = query.eq('manager_user_id', user?.id);
+    }
+    const { data } = await query.order('created_at', { ascending: false });
     const months = data || [];
     setAllMonths(months);
     return months;
-  }, []);
+  }, [isOnlyHistoricalManager, user]);
 
   const fetchDataForMonth = useCallback(async (month: any) => {
     if (!month) return;
