@@ -191,6 +191,8 @@ export default function Auth() {
       if (data?.code) {
         setOtpCode(data.code);
         toast.success(`আপনার রিকভারি কোড: ${data.code}`, { duration: 30000 });
+      } else if (data?.message) {
+        toast.success(data.message);
       }
       playSuccessSound();
       setForgotStep('otp');
@@ -213,6 +215,8 @@ export default function Auth() {
       if (data?.code) {
         setOtpCode(data.code);
         toast.success(`নতুন কোড: ${data.code}`, { duration: 30000 });
+      } else if (data?.message) {
+        toast.success(data.message);
       }
       setResendTimer(60);
     } catch (err: any) {

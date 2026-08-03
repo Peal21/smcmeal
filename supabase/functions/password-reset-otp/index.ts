@@ -92,13 +92,66 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Return the code — this allows the frontend to show it directly.
-      // The user can also check testmail.app for the standard recovery email.
+      // Send email via Resend if RESEND_API_KEY is configured
+      const resendApiKey = Deno.env.get("RESEND_API_KEY");
+      let emailSent = false;
+      let emailError = "";
+
+      if (resendApiKey) {
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${resendApiKey}`,
+            },
+            body: JSON.stringify({
+              from: "SMC Meal Mate <onboarding@resend.dev>",
+              to: email,
+              subject: "Password Reset OTP Code - SMC Meal Mate",
+              html: `
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #f9f9f9;">
+  <div style="text-align: center; margin-bottom: 20px;">
+    <h2 style="color: #2563eb; margin: 0;">সাতক্ষীরা মেডিকেল কলেজ</h2>
+    <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">মিল ম্যানেজমেন্ট সিস্টেম</p>
+  </div>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+  <div style="background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+    <p style="font-size: 16px; color: #333; line-height: 1.5;">প্রিয় সদস্য,</p>
+    <p style="font-size: 15px; color: #555; line-height: 1.5;">আপনার অ্যাকাউন্ট পাসওয়ার্ড রিসেট করার জন্য একটি অনুরোধ পাওয়া গেছে। আপনার ৬ সংখ্যার ওটিপি (OTP) কোডটি নিচে দেওয়া হলো:</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #2563eb; background-color: #eff6ff; padding: 10px 20px; border-radius: 6px; border: 1px dashed #3b82f6;">${code}</span>
+    </div>
+    <p style="font-size: 13px; color: #ef4444; font-weight: 500;">কোডটি আগামী ৫ মিনিটের জন্য কার্যকর থাকবে।</p>
+    <p style="font-size: 14px; color: #555; line-height: 1.5; margin-top: 25px;">আপনি যদি এই অনুরোধটি না করে থাকেন, তবে দয়া করে এই ইমেইলটি উপেক্ষা করুন এবং আপনার পাসওয়ার্ডটি নিরাপদ রাখুন।</p>
+  </div>
+  <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #999;">
+    <p>© ২০২৬ সাতক্ষীরা মেডিকেল কলেজ মিল ম্যানেজমেন্ট সিস্টেম। সর্বস্বত্ব সংরক্ষিত।</p>
+  </div>
+</div>
+              `,
+            }),
+          });
+          
+          if (res.ok) {
+            emailSent = true;
+          } else {
+            const errData = await res.json();
+            emailError = errData.message || "Failed to send email via Resend API";
+          }
+        } catch (e: any) {
+          emailError = e.message || "Error calling Resend API";
+        }
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
-          code,
-          message: "৬ সংখ্যার কোড তৈরি হয়েছে",
+          code: resendApiKey ? undefined : code, // Return code in response for testing if Resend API Key is not set
+          email_sent: emailSent,
+          message: emailSent
+            ? "আপনার ইমেইলে ৬ সংখ্যার ওটিপি কোড পাঠানো হয়েছে।"
+            : (resendApiKey ? `ইমেইল পাঠানো ব্যর্থ হয়েছে: ${emailError}` : "কোড তৈরি হয়েছে (Resend API Key সেট করা নেই)"),
         }),
         { status: 200, headers: corsHeaders }
       );
