@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner';
 import { notifyUpdate } from '@/lib/notify';
 import { format, addDays, isAfter, set, getDay } from 'date-fns';
-import { Sun, Moon, Utensils, Wallet, TrendingUp, Clock, Plus, Trash2, Edit2, Check, X, AlertTriangle, ShieldAlert, Phone, History, Timer } from 'lucide-react';
+import { Sun, Moon, Utensils, Wallet, TrendingUp, Clock, Plus, Minus, Trash2, Edit2, Check, X, AlertTriangle, ShieldAlert, Phone, History, Timer } from 'lucide-react';
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
 import SpecialDayItems from './SpecialDayItems';
 
