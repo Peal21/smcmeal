@@ -80,7 +80,7 @@ function isCutoffPassed(cutoff: CutoffTime): boolean {
 }
 
 export default function StudentDashboard() {
-  const { user, isManager, isAdmin } = useAuth();
+  const { user, profile, isManager, isAdmin } = useAuth();
   const privileged = isManager || isAdmin;
   const notify = (m: string) => notifyUpdate(m, privileged);
   const [todayMeal, setTodayMeal] = useState<any>(null);
@@ -225,6 +225,12 @@ export default function StudentDashboard() {
         .insert({ user_id: user.id, meal_date: resumeDateStr, lunch: true, dinner: true });
     }
 
+    void sendMealUpdateEmail({
+      action: 'HOLIDAY_START',
+      startDate: format(new Date(newOffStart + 'T00:00:00'), 'dd MMM yyyy'),
+      endDate: format(new Date(newOffEnd + 'T00:00:00'), 'dd MMM yyyy')
+    });
+
     toast.success('ছুটি/অফ ডেট রেঞ্জ সফলভাবে যোগ হয়েছে');
     setNewOffStart('');
     setNewOffEnd('');
@@ -269,6 +275,12 @@ export default function StudentDashboard() {
           .insert({ user_id: user.id, meal_date: dateStr, lunch: true, dinner: true });
       }
     }
+
+    void sendMealUpdateEmail({
+      action: 'HOLIDAY_CANCEL',
+      startDate: format(new Date(startDateStr + 'T00:00:00'), 'dd MMM yyyy'),
+      endDate: format(new Date(endDateStr + 'T00:00:00'), 'dd MMM yyyy')
+    });
 
     toast.success('ছুটি/অফ ডেট রেঞ্জ মুছে ফেলা হয়েছে');
     fetchOffPeriods();
@@ -476,6 +488,13 @@ export default function StudentDashboard() {
       }
       await fetchTodayMeal();
       const label = type === 'lunch' ? 'লাঞ্চ' : 'ডিনার';
+
+      void sendMealUpdateEmail({
+        mealType: type,
+        action: value ? 'ON' : 'OFF',
+        mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy')
+      });
+
       if (value) {
         playToggleOnSound();
         notify(`${label} চালু করা হয়েছে`);
@@ -525,6 +544,31 @@ export default function StudentDashboard() {
     fetchTodayMeal();
     playClickSound();
     notify('Extra option আপডেট হয়েছে');
+  };
+
+  const sendMealUpdateEmail = async (params: {
+    mealType?: 'lunch' | 'dinner' | 'both';
+    action: 'ON' | 'OFF' | 'HOLIDAY_START' | 'HOLIDAY_CANCEL';
+    mealDate?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    if (!user || !user.email) return;
+    try {
+      await supabase.functions.invoke('send-meal-update-email', {
+        body: {
+          email: user.email,
+          name: profile?.full_name || user.email,
+          mealType: params.mealType,
+          action: params.action,
+          mealDate: params.mealDate,
+          startDate: params.startDate,
+          endDate: params.endDate,
+        }
+      });
+    } catch (err) {
+      console.error('Error invoking email function:', err);
+    }
   };
 
   const canEditExtraMeal = (mealDateStr: string): boolean => {

@@ -15,3 +15,6 @@ verify_jwt = false
 [functions.auto-carry-meals]
 verify_jwt = false
 
+[functions.send-meal-update-email]
+verify_jwt = false
+
