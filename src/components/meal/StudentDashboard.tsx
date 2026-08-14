@@ -90,6 +90,10 @@ export default function StudentDashboard() {
   const [extraMealType, setExtraMealType] = useState('lunch');
   const [extraReason, setExtraReason] = useState('');
   const [myExtraMeals, setMyExtraMeals] = useState<any[]>([]);
+  const [offPeriods, setOffPeriods] = useState<any[]>([]);
+  const [newOffStart, setNewOffStart] = useState<string>('');
+  const [newOffEnd, setNewOffEnd] = useState<string>('');
+  const [savingOffPeriod, setSavingOffPeriod] = useState(false);
   
   const [showExtraItemDialog, setShowExtraItemDialog] = useState(false);
   const [pendingExtraOption, setPendingExtraOption] = useState<string[]>([]);
@@ -103,6 +107,9 @@ export default function StudentDashboard() {
   const historyMonthIdRef = useRef<string>('');
   useEffect(() => { historyMonthIdRef.current = historyMonthId; }, [historyMonthId]);
   const mealDate = getMealDate();
+  const tomorrowExtras = myExtraMeals.filter(em => em.meal_date === mealDate);
+  const tomorrowExtraLunch = tomorrowExtras.find(em => em.meal_type === 'lunch');
+  const tomorrowExtraDinner = tomorrowExtras.find(em => em.meal_type === 'dinner');
   const notified9 = useRef(false);
   const notified945 = useRef(false);
   const [cutoffTime, setCutoffTime] = useState<CutoffTime>({ hour: 22, minute: 0 });
@@ -133,6 +140,140 @@ export default function StudentDashboard() {
       .eq('user_id', user.id).gte('meal_date', startOfMonth).lte('meal_date', endOfMonth)
       .order('created_at', { ascending: false });
     setMyExtraMeals(data || []);
+  };
+
+  const fetchOffPeriods = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('meal_off_periods' as any)
+      .select('*')
+      .eq('user_id', user.id)
+      .order('start_date', { ascending: true });
+    setOffPeriods(data || []);
+  };
+
+  const addOffPeriod = async () => {
+    if (!user || !newOffStart || !newOffEnd) {
+      toast.error('শুরু এবং শেষ তারিখ সিলেক্ট করুন');
+      return;
+    }
+    const start = new Date(newOffStart + 'T00:00:00');
+    const end = new Date(newOffEnd + 'T00:00:00');
+    if (end < start) {
+      toast.error('শেষ তারিখ শুরু তারিখের আগে হতে পারবে না');
+      return;
+    }
+
+    setSavingOffPeriod(true);
+    const { error } = await supabase.from('meal_off_periods' as any).insert({
+      user_id: user.id,
+      start_date: newOffStart,
+      end_date: newOffEnd,
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setSavingOffPeriod(false);
+      return;
+    }
+
+    const dates: string[] = [];
+    let curr = new Date(start);
+    while (curr <= end) {
+      dates.push(format(curr, 'yyyy-MM-dd'));
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    for (const dateStr of dates) {
+      const { data: existing } = await supabase
+        .from('daily_meals')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('meal_date', dateStr)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('daily_meals')
+          .update({ lunch: false, dinner: false })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('daily_meals')
+          .insert({ user_id: user.id, meal_date: dateStr, lunch: false, dinner: false });
+      }
+    }
+
+    const resumeDate = new Date(end);
+    resumeDate.setDate(resumeDate.getDate() + 1);
+    const resumeDateStr = format(resumeDate, 'yyyy-MM-dd');
+    const { data: resumeExisting } = await supabase
+      .from('daily_meals')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('meal_date', resumeDateStr)
+      .maybeSingle();
+
+    if (resumeExisting) {
+      await supabase
+        .from('daily_meals')
+        .update({ lunch: true, dinner: true })
+        .eq('id', resumeExisting.id);
+    } else {
+      await supabase
+        .from('daily_meals')
+        .insert({ user_id: user.id, meal_date: resumeDateStr, lunch: true, dinner: true });
+    }
+
+    toast.success('ছুটি/অফ ডেট রেঞ্জ সফলভাবে যোগ হয়েছে');
+    setNewOffStart('');
+    setNewOffEnd('');
+    fetchOffPeriods();
+    fetchTodayMeal();
+    fetchMonthStats();
+    setSavingOffPeriod(false);
+  };
+
+  const deleteOffPeriod = async (id: string, startDateStr: string, endDateStr: string) => {
+    const { error } = await supabase.from('meal_off_periods' as any).delete().eq('id', id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const start = new Date(startDateStr + 'T00:00:00');
+    const end = new Date(endDateStr + 'T00:00:00');
+    const dates: string[] = [];
+    let curr = new Date(start);
+    while (curr <= end) {
+      dates.push(format(curr, 'yyyy-MM-dd'));
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    for (const dateStr of dates) {
+      const { data: existing } = await supabase
+        .from('daily_meals')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('meal_date', dateStr)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('daily_meals')
+          .update({ lunch: true, dinner: true })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('daily_meals')
+          .insert({ user_id: user.id, meal_date: dateStr, lunch: true, dinner: true });
+      }
+    }
+
+    toast.success('ছুটি/অফ ডেট রেঞ্জ মুছে ফেলা হয়েছে');
+    fetchOffPeriods();
+    fetchTodayMeal();
+    fetchMonthStats();
   };
 
   const fetchMonthStats = async () => {
@@ -240,6 +381,7 @@ export default function StudentDashboard() {
     fetchTodayMeal();
     fetchMonthStats();
     fetchExtraMeals();
+    fetchOffPeriods();
     fetchHistory();
     fetchAllMonths();
     const channel = supabase
@@ -249,6 +391,9 @@ export default function StudentDashboard() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_meals', filter: `user_id=eq.${user?.id}` }, () => {
         fetchExtraMeals(); fetchMonthStats(); fetchHistory();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_off_periods', filter: `user_id=eq.${user?.id}` }, () => {
+        fetchOffPeriods(); fetchTodayMeal(); fetchMonthStats();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `user_id=eq.${user?.id}` }, () => {
         fetchMonthStats();
@@ -400,6 +545,52 @@ export default function StudentDashboard() {
     const regularExtras = getSelectedExtras(extraMealType as 'lunch' | 'dinner');
     setPendingExtraOption(regularExtras.length > 0 ? [...regularExtras] : []);
     setShowExtraItemDialog(true);
+  };
+
+  const handleIncTomorrowExtra = (type: 'lunch' | 'dinner') => {
+    if (isCutoffPassed(cutoffTime)) { toast.error('কাটঅফ টাইমের পর Extra মিল পরিবর্তন করা যাবে না'); return; }
+    const existing = type === 'lunch' ? tomorrowExtraLunch : tomorrowExtraDinner;
+    if (existing) {
+      setEditingExtraMealId(existing.id);
+      setExtraMealType(type);
+      setExtraQuantity(String(existing.quantity + 1));
+      const opts = (existing.extra_option || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      setPendingExtraOption(opts);
+      setShowExtraItemDialog(true);
+    } else {
+      setEditingExtraMealId(null);
+      setExtraMealType(type);
+      setExtraQuantity('1');
+      const regularExtras = getSelectedExtras(type);
+      setPendingExtraOption(regularExtras.length > 0 ? [...regularExtras] : []);
+      setShowExtraItemDialog(true);
+    }
+  };
+
+  const handleDecTomorrowExtra = async (type: 'lunch' | 'dinner') => {
+    if (isCutoffPassed(cutoffTime)) { toast.error('কাটঅফ টাইমের পর Extra মিল পরিবর্তন করা যাবে না'); return; }
+    const existing = type === 'lunch' ? tomorrowExtraLunch : tomorrowExtraDinner;
+    if (!existing) return;
+
+    if (existing.quantity <= 1) {
+      await deleteExtraMeal(existing.id, mealDate);
+    } else {
+      const opts = (existing.extra_option || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (opts.length > 0) opts.pop();
+      const newOptsStr = opts.join(',');
+      
+      const { error } = await supabase.from('extra_meals').update({
+        quantity: existing.quantity - 1,
+        extra_option: newOptsStr,
+      } as any).eq('id', existing.id);
+
+      if (error) toast.error(error.message);
+      else {
+        notify('অতিরিক্ত মিল কমানো হয়েছে');
+        fetchExtraMeals();
+        fetchMonthStats();
+      }
+    }
   };
 
   const openEditExtraDialog = (em: any) => {
@@ -750,7 +941,7 @@ export default function StudentDashboard() {
       <SpecialDayItems />
 
       {/* Extra Meal Request */}
-      <Card className="card-hover card-shine overflow-hidden">
+      <Card className="card-hover card-shine overflow-hidden border border-border/40">
         <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3">
           <CardTitle className="font-bengali flex items-center gap-2 text-lg">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -761,65 +952,175 @@ export default function StudentDashboard() {
           <p className="text-xs text-muted-foreground font-bengali">Feast Day (সোম/শুক্র) তে ১ serving = ৩ মিল হিসেবে গণনা হবে।</p>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div>
-              <Label className="font-bengali text-xs">ধরন</Label>
-              <Select value={extraMealType} onValueChange={setExtraMealType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lunch">লাঞ্চ</SelectItem>
-                  <SelectItem value="dinner">ডিনার</SelectItem>
-                </SelectContent>
-              </Select>
+          
+          {/* Lunch Extra Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-border/50 bg-secondary/10 gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Sun className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-semibold font-bengali text-sm">লাঞ্চ অতিরিক্ত (Lunch Extra)</p>
+                {tomorrowExtraLunch && (
+                  <p className="text-xs text-muted-foreground font-bengali mt-0.5">
+                    মোট মিল: {tomorrowExtraLunch.quantity * tomorrowExtraLunch.meal_count_equivalent} মিল {tomorrowExtraLunch.is_feast_day ? '(Feast Day ×3)' : ''}
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <Label className="font-bengali text-xs">কয়টি serving</Label>
-              <Input type="number" min="0" max="10" value={extraQuantity} onChange={e => setExtraQuantity(e.target.value)} />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <Label className="font-bengali text-xs">কারণ (ঐচ্ছিক)</Label>
-              <Input value={extraReason} onChange={e => setExtraReason(e.target.value)} placeholder="যেমন: মেহমান" />
+            
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-lg"
+                onClick={() => handleDecTomorrowExtra('lunch')}
+                disabled={!tomorrowExtraLunch || cutoff}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="font-bold font-bengali text-base w-6 text-center">
+                {tomorrowExtraLunch?.quantity || 0}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-lg"
+                onClick={() => handleIncTomorrowExtra('lunch')}
+                disabled={cutoff}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          {(() => {
-            const q = parseInt(extraQuantity) || 0;
-            if (q < 1) return null;
-            const d = new Date(mealDate);
-            const dow = d.getDay();
-            const isFeast = dow === 1 || dow === 5;
-            const mult = isFeast ? 3 : 1;
-            const total = q * mult;
-            return (
-              <div className={`p-3 rounded-lg border text-sm font-bengali ${isFeast ? 'bg-destructive/5 border-destructive/30 text-destructive' : 'bg-primary/5 border-primary/30 text-primary'}`}>
-                {isFeast ? '🎉 Feast Day: ' : '📊 হিসাব: '}
-                <strong>{q} serving × {mult}</strong> = <strong>{total} মিল</strong> যোগ হবে
+          
+          {/* Lunch Extra Item Badges */}
+          {tomorrowExtraLunch && (
+            <div className="text-xs font-bengali text-muted-foreground bg-secondary/5 p-2 rounded-lg border border-dashed flex items-center justify-between gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span>আইটেম:</span>
+                {tomorrowExtraLunch.extra_option ? (
+                  (() => {
+                    const items = tomorrowExtraLunch.extra_option.split(',').map((s: string) => s.trim()).filter(Boolean);
+                    const counts = items.reduce((acc: Record<string, number>, v: string) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
+                    return Object.entries(counts).map(([v, c]) => (
+                      <Badge key={v} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {EXTRA_LABEL_MAP[v] || v}{(c as number) > 1 ? ` × ${c}` : ''}
+                      </Badge>
+                    ));
+                  })()
+                ) : (
+                  <span className="text-destructive font-semibold">কোনো আইটেম বাছাই করা হয়নি</span>
+                )}
               </div>
-            );
-          })()}
-          <Button onClick={openExtraMealDialog} className="w-full font-bengali gap-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all">
-            <Plus className="h-4 w-4" /> অতিরিক্ত মিল যোগ করুন
-          </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] text-primary font-bengali gap-1 hover:bg-primary/5"
+                onClick={() => openEditExtraDialog(tomorrowExtraLunch)}
+                disabled={cutoff}
+              >
+                <Edit2 className="h-3 w-3" /> আইটেম পরিবর্তন
+              </Button>
+            </div>
+          )}
+
+          {/* Dinner Extra Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-border/50 bg-secondary/10 gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10 text-info">
+                <Moon className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-semibold font-bengali text-sm">ডিনার অতিরিক্ত (Dinner Extra)</p>
+                {tomorrowExtraDinner && (
+                  <p className="text-xs text-muted-foreground font-bengali mt-0.5">
+                    মোট মিল: {tomorrowExtraDinner.quantity * tomorrowExtraDinner.meal_count_equivalent} মিল {tomorrowExtraDinner.is_feast_day ? '(Feast Day ×3)' : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-lg"
+                onClick={() => handleDecTomorrowExtra('dinner')}
+                disabled={!tomorrowExtraDinner || cutoff}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="font-bold font-bengali text-base w-6 text-center">
+                {tomorrowExtraDinner?.quantity || 0}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-lg"
+                onClick={() => handleIncTomorrowExtra('dinner')}
+                disabled={cutoff}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Dinner Extra Item Badges */}
+          {tomorrowExtraDinner && (
+            <div className="text-xs font-bengali text-muted-foreground bg-secondary/5 p-2 rounded-lg border border-dashed flex items-center justify-between gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span>আইটেম:</span>
+                {tomorrowExtraDinner.extra_option ? (
+                  (() => {
+                    const items = tomorrowExtraDinner.extra_option.split(',').map((s: string) => s.trim()).filter(Boolean);
+                    const counts = items.reduce((acc: Record<string, number>, v: string) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
+                    return Object.entries(counts).map(([v, c]) => (
+                      <Badge key={v} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {EXTRA_LABEL_MAP[v] || v}{(c as number) > 1 ? ` × ${c}` : ''}
+                      </Badge>
+                    ));
+                  })()
+                ) : (
+                  <span className="text-destructive font-semibold">কোনো আইটেম বাছাই করা হয়নি</span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] text-primary font-bengali gap-1 hover:bg-primary/5"
+                onClick={() => openEditExtraDialog(tomorrowExtraDinner)}
+                disabled={cutoff}
+              >
+                <Edit2 className="h-3 w-3" /> আইটেম পরিবর্তন
+              </Button>
+            </div>
+          )}
 
           {myExtraMeals.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <Label className="font-bengali text-xs text-muted-foreground">এই মাসের অতিরিক্ত মিল:</Label>
-              <div className="space-y-1.5">
+            <div className="space-y-2 pt-2 border-t border-border/40">
+              <Label className="font-bengali text-xs text-muted-foreground">এই মাসের অতিরিক্ত মিলের তালিকা:</Label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                 {myExtraMeals.map(em => (
-                  <div key={em.id} className="flex justify-between items-center text-sm p-3 rounded-xl bg-secondary/30 border border-border/50 gap-2 transition-all hover:bg-secondary/50">
-                    <span className="font-bengali flex-1">
+                  <div key={em.id} className="flex justify-between items-center text-sm p-3 rounded-xl bg-secondary/35 border border-border/30 gap-2 transition-all hover:bg-secondary/50">
+                    <span className="font-bengali flex-1 text-xs">
                       {em.meal_type === 'lunch' ? '🌞 লাঞ্চ' : '🌙 ডিনার'} × {em.quantity}
-                      {em.is_feast_day && <Badge variant="destructive" className="ml-1 text-[10px] px-1">Feast ×3</Badge>}
+                      {em.is_feast_day && <Badge variant="destructive" className="ml-1 text-[9px] px-1 py-0">Feast ×3</Badge>}
                       {em.extra_option && (() => {
                         const items = em.extra_option.split(',').map((s: string) => s.trim()).filter(Boolean);
                         const counts = items.reduce((acc: Record<string, number>, v: string) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
                         const label = Object.entries(counts).map(([v, c]) => `${EXTRA_LABEL_MAP[v] || v}${(c as number) > 1 ? `×${c}` : ''}`).join(', ');
-                        return <span className="ml-1 text-xs text-muted-foreground">[{label}]</span>;
+                        return <span className="ml-1 text-[10px] text-muted-foreground">[{label}]</span>;
                       })()}
-                      {em.reason && <span className="text-muted-foreground ml-1">({em.reason})</span>}
-                      <span className="text-muted-foreground ml-1">= {em.quantity * em.meal_count_equivalent} মিল</span>
+                      {em.reason && <span className="text-muted-foreground ml-1 font-bengali">({em.reason})</span>}
+                      <span className="text-muted-foreground ml-1 font-semibold font-bengali">= {em.quantity * em.meal_count_equivalent} মিল</span>
                     </span>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(em.meal_date), 'dd MMM')}</span>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{format(new Date(em.meal_date), 'dd MMM')}</span>
                       {canEditExtraMeal(em.meal_date) ? (
                         <>
                           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditExtraDialog(em)}>
@@ -830,11 +1131,81 @@ export default function StudentDashboard() {
                           </Button>
                         </>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] font-bengali">লক</Badge>
+                        <Badge variant="outline" className="text-[9px] font-bengali py-0 px-1">লক</Badge>
                       )}
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Vacation / Custom Off Date Range Card */}
+      <Card className="card-hover card-shine overflow-hidden border border-border/40">
+        <CardHeader className="bg-gradient-to-r from-warning/10 via-transparent to-transparent pb-3">
+          <CardTitle className="font-bengali flex items-center gap-2 text-lg">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/20">
+              <Clock className="h-4 w-4 text-warning" />
+            </div>
+            ছুটি / মিল অফ ডেট রেঞ্জ
+          </CardTitle>
+          <p className="text-xs text-muted-foreground font-bengali">নির্দিষ্ট ডেট রেঞ্জের মধ্যে আপনার মিল স্বয়ংক্রিয়ভাবে বন্ধ থাকবে।</p>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="font-bengali text-xs">ছুটি শুরু</Label>
+              <Input
+                type="date"
+                value={newOffStart}
+                onChange={e => setNewOffStart(e.target.value)}
+                className="font-bengali text-sm bg-background/50"
+              />
+            </div>
+            <div>
+              <Label className="font-bengali text-xs">ছুটি শেষ</Label>
+              <Input
+                type="date"
+                value={newOffEnd}
+                onChange={e => setNewOffEnd(e.target.value)}
+                className="font-bengali text-sm bg-background/50"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={addOffPeriod}
+            disabled={savingOffPeriod}
+            className="w-full font-bengali gap-1 bg-gradient-to-r from-warning to-warning/80 hover:from-warning/90 hover:to-warning/70 text-black font-semibold"
+          >
+            {savingOffPeriod ? 'প্রসেসিং হচ্ছে...' : 'ছুটি/অফ চালু করুন'}
+          </Button>
+
+          {offPeriods.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-border/40">
+              <Label className="font-bengali text-xs text-muted-foreground">আপনার সক্রিয় ছুটিসমূহ:</Label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {offPeriods.map((p: any) => {
+                  const sD = new Date(p.start_date + 'T00:00:00');
+                  const eD = new Date(p.end_date + 'T00:00:00');
+                  const days = Math.round((eD.getTime() - sD.getTime()) / (1000 * 3600 * 24)) + 1;
+                  return (
+                    <div key={p.id} className="flex justify-between items-center text-sm p-3 rounded-xl bg-warning/5 border border-warning/20 gap-2 transition-all hover:bg-warning/10">
+                      <span className="font-bengali flex-1 text-xs">
+                        🏝️ <strong>{format(sD, 'dd MMM')}</strong> হতে <strong>{format(eD, 'dd MMM yyyy')}</strong> ({days} দিন)
+                      </span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 hover:bg-destructive/15 text-destructive"
+                        onClick={() => deleteOffPeriod(p.id, p.start_date, p.end_date)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

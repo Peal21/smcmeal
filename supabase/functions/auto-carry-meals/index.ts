@@ -60,12 +60,17 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ message: "No active users" }), { status: 200, headers: corsHeaders });
   }
 
-  const [existingTargetMealsRes, sourceMealsRes] = await Promise.all([
+  const [existingTargetMealsRes, sourceMealsRes, offPeriodsRes] = await Promise.all([
     supabase.from("daily_meals").select("id, user_id, lunch, dinner, lunch_extra_option, dinner_extra_option").eq("meal_date", targetDate),
     supabase
       .from("daily_meals")
       .select("user_id, lunch, dinner, lunch_extra_option, dinner_extra_option, lunch_off_today_only, dinner_off_today_only")
       .eq("meal_date", sourceDate),
+    supabase
+      .from("meal_off_periods")
+      .select("user_id, start_date, end_date")
+      .lte("start_date", targetDate)
+      .gte("end_date", sourceDate),
   ]);
 
   if (existingTargetMealsRes.error) {
@@ -76,12 +81,17 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: sourceMealsRes.error.message }), { status: 500, headers: corsHeaders });
   }
 
+  if (offPeriodsRes.error) {
+    return new Response(JSON.stringify({ error: offPeriodsRes.error.message }), { status: 500, headers: corsHeaders });
+  }
+
   const existingTargetMap = new Map(
     (existingTargetMealsRes.data || []).map((m) => [m.user_id, m])
   );
   const sourceMealMap = new Map(
     (sourceMealsRes.data || []).map((m) => [m.user_id, m])
   );
+  const offPeriods = offPeriodsRes.data || [];
 
   const rowsToInsert: any[] = [];
   const rowsToUpdate: { id: string; data: any }[] = [];
@@ -89,17 +99,36 @@ Deno.serve(async (req) => {
 
   for (const u of activeUsers) {
     const sourceMeal = sourceMealMap.get(u.user_id);
-    if (!sourceMeal) { skippedCount++; continue; }
+    
+    // Check if targetDate or sourceDate falls within any of this user's off periods
+    const isTargetOff = offPeriods.some(
+      (p: any) => p.user_id === u.user_id && targetDate >= p.start_date && targetDate <= p.end_date
+    );
+    const isSourceOff = offPeriods.some(
+      (p: any) => p.user_id === u.user_id && sourceDate >= p.start_date && sourceDate <= p.end_date
+    );
 
-    // If user marked "off today only", flip back ON for next day
-    const carriedLunch = sourceMeal.lunch_off_today_only ? true : sourceMeal.lunch;
-    const carriedDinner = sourceMeal.dinner_off_today_only ? true : sourceMeal.dinner;
+    let carriedLunch = false;
+    let carriedDinner = false;
+
+    if (isTargetOff) {
+      carriedLunch = false;
+      carriedDinner = false;
+    } else if (isSourceOff) {
+      // The off period has just ended, restore default state to ON
+      carriedLunch = true;
+      carriedDinner = true;
+    } else {
+      if (!sourceMeal) { skippedCount++; continue; }
+      carriedLunch = sourceMeal.lunch_off_today_only ? true : sourceMeal.lunch;
+      carriedDinner = sourceMeal.dinner_off_today_only ? true : sourceMeal.dinner;
+    }
 
     const carriedData = {
       lunch: carriedLunch,
       dinner: carriedDinner,
-      lunch_extra_option: sourceMeal.lunch_extra_option,
-      dinner_extra_option: sourceMeal.dinner_extra_option,
+      lunch_extra_option: sourceMeal?.lunch_extra_option || null,
+      dinner_extra_option: sourceMeal?.dinner_extra_option || null,
       // Always reset off_today_only flags for the new day
       lunch_off_today_only: false,
       dinner_off_today_only: false,

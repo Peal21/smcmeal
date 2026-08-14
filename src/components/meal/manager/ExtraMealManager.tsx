@@ -60,6 +60,7 @@ export default function ExtraMealManager() {
   const [quantity, setQuantity] = useState('0');
   const [reason, setReason] = useState('guest');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [addExtraOptions, setAddExtraOptions] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({
     quantity: '1', mealType: 'lunch', reason: 'guest',
@@ -100,10 +101,33 @@ export default function ExtraMealManager() {
     return day === 1 || day === 5;
   };
 
+  const incAddExtra = (value: string) => {
+    const qty = parseFloat(quantity) || 0;
+    if (addExtraOptions.length >= qty) {
+      toast.error(`সর্বোচ্চ ${qty}টি item`);
+      return;
+    }
+    setAddExtraOptions(s => [...s, value]);
+  };
+
+  const decAddExtra = (value: string) => {
+    setAddExtraOptions(s => {
+      const idx = s.lastIndexOf(value);
+      if (idx === -1) return s;
+      const next = [...s];
+      next.splice(idx, 1);
+      return next;
+    });
+  };
+
   const addExtraMeal = async () => {
     if (!selectedMember || !user) return;
     const qty = parseFloat(quantity) || 0;
     if (qty < 1) { toast.error('সংখ্যা কমপক্ষে ১ হতে হবে'); return; }
+    if (addExtraOptions.length !== qty) {
+      toast.error(`${qty}টি serving — তাই ঠিক ${qty}টি item বাছাই করুন (এখন ${addExtraOptions.length}টি)`);
+      return;
+    }
     const feast = isFeastDay(selectedDate);
     const mealCountEquivalent = feast ? 3 : 1;
 
@@ -116,6 +140,7 @@ export default function ExtraMealManager() {
       is_feast_day: feast,
       meal_count_equivalent: mealCountEquivalent,
       added_by: user.id,
+      extra_option: addExtraOptions.join(',') || null,
     });
 
     if (error) toast.error(error.message);
@@ -123,6 +148,7 @@ export default function ExtraMealManager() {
       toast.success(`Extra মিল যোগ হয়েছে${feast ? ' (Feast Day — ১ মিল = ৩ মিল)' : ''}`);
       setQuantity('0');
       setSelectedMember('');
+      setAddExtraOptions([]);
       fetchData();
     }
   };
@@ -237,7 +263,10 @@ export default function ExtraMealManager() {
             </div>
             <div>
               <Label className="font-bengali">কয়টি serving</Label>
-              <Input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="0" step="0.5" />
+              <Input type="number" value={quantity} onChange={e => {
+                setQuantity(e.target.value);
+                setAddExtraOptions([]);
+              }} min="0" step="0.5" />
             </div>
             <div>
               <Label className="font-bengali">কারণ</Label>
@@ -248,6 +277,33 @@ export default function ExtraMealManager() {
                   <SelectItem value="extra_self">নিজের extra</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label className="font-bengali">Extra Item (গরু/খাসি)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-bengali text-sm" disabled={parseFloat(quantity) <= 0}>
+                    <span>{addExtraOptions.length}টি item</span>
+                    <Utensils className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2 space-y-1">
+                  <p className="text-xs font-bengali text-muted-foreground">নির্বাচিত: {addExtraOptions.length}/{parseFloat(quantity) || 0}টি</p>
+                  {EXTRA_OPTIONS_LIST.map(o => {
+                    const count = addExtraOptions.filter(v => v === o.value).length;
+                    return (
+                      <div key={o.value} className="flex items-center justify-between gap-2 p-1.5 rounded hover:bg-accent/10 text-xs">
+                        <span className="font-bengali">{o.label}</span>
+                        <div className="flex items-center gap-1">
+                          <Button type="button" size="icon" variant="outline" className="h-6 w-6" onClick={() => decAddExtra(o.value)} disabled={count === 0}>−</Button>
+                          <span className="w-5 text-center font-bold">{count}</span>
+                          <Button type="button" size="icon" variant="outline" className="h-6 w-6" onClick={() => incAddExtra(o.value)}>+</Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex items-end">
               <Button onClick={addExtraMeal} className="w-full font-bengali gap-1 bg-gradient-to-r from-primary to-primary/80" disabled={!selectedMember}>
