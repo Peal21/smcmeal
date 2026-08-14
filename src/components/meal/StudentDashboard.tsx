@@ -548,10 +548,13 @@ export default function StudentDashboard() {
 
   const sendMealUpdateEmail = async (params: {
     mealType?: 'lunch' | 'dinner' | 'both';
-    action: 'ON' | 'OFF' | 'HOLIDAY_START' | 'HOLIDAY_CANCEL';
+    action: 'ON' | 'OFF' | 'HOLIDAY_START' | 'HOLIDAY_CANCEL' | 'EXTRA_MEAL_ADD' | 'EXTRA_MEAL_DELETE';
     mealDate?: string;
     startDate?: string;
     endDate?: string;
+    quantity?: number;
+    extraOption?: string;
+    mealCountEquivalent?: number;
   }) => {
     if (!user || !user.email) return;
     try {
@@ -564,6 +567,9 @@ export default function StudentDashboard() {
           mealDate: params.mealDate,
           startDate: params.startDate,
           endDate: params.endDate,
+          quantity: params.quantity,
+          extraOption: params.extraOption,
+          mealCountEquivalent: params.mealCountEquivalent,
         }
       });
     } catch (err) {
@@ -691,6 +697,14 @@ export default function StudentDashboard() {
       } as any).eq('id', editingExtraMealId);
       if (error) { toast.error(error.message); return; }
       playSuccessSound();
+      void sendMealUpdateEmail({
+        action: 'EXTRA_MEAL_ADD',
+        mealType: extraMealType as any,
+        quantity: qty,
+        extraOption: extraOptionStr,
+        mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy'),
+        mealCountEquivalent: 1
+      });
       notify('আপডেট হয়েছে');
     } else {
       const mealDateObj = new Date(mealDate);
@@ -711,6 +725,14 @@ export default function StudentDashboard() {
 
       if (error) { toast.error(error.message); return; }
       playSuccessSound();
+      void sendMealUpdateEmail({
+        action: 'EXTRA_MEAL_ADD',
+        mealType: extraMealType as any,
+        quantity: qty,
+        extraOption: extraOptionStr,
+        mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy'),
+        mealCountEquivalent: mealCountEquivalent
+      });
       notify(`${qty}টি অতিরিক্ত ${extraMealType === 'lunch' ? 'লাঞ্চ' : 'ডিনার'} যোগ হয়েছে${isFeast ? ' (Feast Day — ১টি = ৩ মিল)' : ''}`);
       setExtraQuantity('0');
       setExtraReason('');
@@ -722,10 +744,18 @@ export default function StudentDashboard() {
 
   const deleteExtraMeal = async (id: string, mealDateStr: string) => {
     if (!canEditExtraMeal(mealDateStr)) { toast.error('এই দিনের Extra মিল আর পরিবর্তন করা যাবে না (রাত ১০:০০ পার)'); return; }
+    const { data: em } = await supabase.from('extra_meals').select('meal_type').eq('id', id).maybeSingle();
     const { error } = await supabase.from('extra_meals').delete().eq('id', id);
     if (error) toast.error(error.message);
     else {
       playToggleOffSound();
+      if (em) {
+        void sendMealUpdateEmail({
+          action: 'EXTRA_MEAL_DELETE',
+          mealType: em.meal_type as any,
+          mealDate: format(new Date(mealDateStr + 'T00:00:00'), 'dd MMMM yyyy')
+        });
+      }
       notify('অতিরিক্ত মিল মুছে ফেলা হয়েছে');
     }
   };

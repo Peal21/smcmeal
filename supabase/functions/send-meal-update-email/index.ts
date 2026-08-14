@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, name, mealType, action, mealDate, startDate, endDate } = body;
+    const { email, name, mealType, action, mealDate, startDate, endDate, quantity, extraOption } = body;
 
     if (!email) {
       return new Response(
@@ -78,6 +78,49 @@ Deno.serve(async (req) => {
         </p>
         <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
           <strong>স্ট্যাটাস:</strong> আপনার ছুটি বাতিল করা হয়েছে। মিল পুনরায় স্বাভাবিক নিয়মে সচল থাকবে।
+        </p>
+      `;
+    } else if (action === "EXTRA_MEAL_ADD") {
+      const typeText = mealType === "lunch" ? "লাঞ্চ" : "ডিনার";
+      subject = `Extra Meal Added: ${typeText} - SMC Meal Mate`;
+      const EXTRA_LABEL_MAP: Record<string, string> = {
+        beef: 'গরু', mutton: 'খাসি', chicken: 'গরু/খাসির পরিবর্তে মুরগি',
+        egg_fish_fry: 'ডিম ভাজি(মাছ)', egg_fish_poach: 'ডিম পোচ(মাছ)',
+        egg_chicken_fry: 'ডিম ভাজি(পোল্ট্রি)', egg_chicken_poach: 'ডিম পোচ(পোল্ট্রি)',
+      };
+      const itemsLabel = extraOption 
+        ? extraOption.split(',').map((s: string) => EXTRA_LABEL_MAP[s.trim()] || s.trim()).join(', ')
+        : 'কোনো নির্দিষ্ট আইটেম নেই';
+
+      detailsHtml = `
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>আপডেটের ধরন:</strong> অতিরিক্ত মিল যোগ করা হয়েছে
+        </p>
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>মিল:</strong> ${typeText} (${mealType === 'lunch' ? 'দুপুর' : 'রাত'})
+        </p>
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>পরিমাণ:</strong> ${quantity}টি (সমান = ${quantity * (body.mealCountEquivalent || 1)} মিল)
+        </p>
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>আইটেমসমূহ:</strong> [${itemsLabel}]
+        </p>
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>তারিখ:</strong> ${mealDate}
+        </p>
+      `;
+    } else if (action === "EXTRA_MEAL_DELETE") {
+      const typeText = mealType === "lunch" ? "লাঞ্চ" : "ডিনার";
+      subject = `Extra Meal Cancelled: ${typeText} - SMC Meal Mate`;
+      detailsHtml = `
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>আপডেটের ধরন:</strong> অতিরিক্ত মিল বাতিল/মুছে ফেলা হয়েছে
+        </p>
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>মিল:</strong> ${typeText}
+        </p>
+        <p style="font-size: 15px; color: #555; line-height: 1.5; margin: 5px 0;">
+          <strong>তারিখ:</strong> ${mealDate}
         </p>
       `;
     }
