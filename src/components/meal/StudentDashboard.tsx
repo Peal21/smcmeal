@@ -502,10 +502,10 @@ export default function StudentDashboard() {
     void toggleMeal(type, nextValue);
   };
 
-  const toggleExtra = async (value: string, checked: boolean) => {
+  const toggleExtra = async (mealType: 'lunch' | 'dinner', value: string, checked: boolean) => {
     if (!user) return;
     if (isCutoffPassed(cutoffTime)) { toast.error('কাটঅফ টাইমের পর Extra item পরিবর্তন করা যাবে না'); return; }
-    let current = getSelectedExtras();
+    let current = getSelectedExtras(mealType);
     if (checked) {
       const option = EXTRA_OPTIONS.find(o => o.value === value);
       const group = option?.group;
@@ -517,10 +517,15 @@ export default function StudentDashboard() {
       current = current.filter(v => v !== value);
     }
     const stored = current.length > 0 ? current.join(',') : null;
+    const updatePayload = mealType === 'lunch' ? { lunch_extra_option: stored } : { dinner_extra_option: stored };
+    const insertPayload = mealType === 'lunch'
+      ? { user_id: user.id, meal_date: mealDate, lunch_extra_option: stored }
+      : { user_id: user.id, meal_date: mealDate, dinner_extra_option: stored };
+
     if (todayMeal) {
-      await supabase.from('daily_meals').update({ lunch_extra_option: stored }).eq('id', todayMeal.id);
+      await supabase.from('daily_meals').update(updatePayload).eq('id', todayMeal.id);
     } else {
-      await supabase.from('daily_meals').insert({ user_id: user.id, meal_date: mealDate, lunch_extra_option: stored });
+      await supabase.from('daily_meals').insert(insertPayload);
     }
     fetchTodayMeal();
     playClickSound();
@@ -697,7 +702,8 @@ export default function StudentDashboard() {
     </div>
   );
 
-  const selectedExtras = getSelectedExtras();
+  const selectedExtrasLunch = getSelectedExtras('lunch');
+  const selectedExtrasDinner = getSelectedExtras('dinner');
 
   return (
     <div className="space-y-5 page-enter stagger-children">
@@ -766,38 +772,76 @@ export default function StudentDashboard() {
         </CardHeader>
         <CardContent className="space-y-6 pt-5">
           {/* Extra Options Checklist */}
-          <div className="p-4 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 via-transparent to-transparent space-y-3">
-            <Label className="font-bengali font-semibold text-xs text-accent-foreground flex items-center gap-2">
-              🍳 Extra Option <span className="text-[10px] font-normal text-muted-foreground">(ঐচ্ছিক — প্রয়োজন অনুযায়ী বাছাই করুন)</span>
-            </Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {EXTRA_OPTIONS.map(o => (
-                <label 
-                  key={o.value} 
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-all duration-300 ${
-                    selectedExtras.includes(o.value)
-                      ? 'bg-accent/10 border-accent/40 text-accent-foreground shadow-sm shadow-accent/5'
-                      : 'bg-background/40 border-transparent hover:border-accent/20 hover:bg-accent/5 text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Checkbox
-                    checked={selectedExtras.includes(o.value)}
-                    onCheckedChange={(checked) => toggleExtra(o.value, !!checked)}
-                    disabled={cutoff}
-                    className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
-                  />
-                  <span className="font-bengali leading-tight">{o.label}</span>
-                </label>
-              ))}
-            </div>
-            {selectedExtras.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-accent/10">
-                {selectedExtras.map(v => {
-                  const opt = EXTRA_OPTIONS.find(o => o.value === v);
-                  return <Badge key={v} className="font-bengali text-[10px] bg-accent/20 text-accent-foreground border-0 hover:bg-accent/30">{opt?.label}</Badge>;
-                })}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+            {/* Lunch Extra Options */}
+            <div className="p-4 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent space-y-3 shadow-sm shadow-primary/5">
+              <Label className="font-bengali font-semibold text-xs text-primary flex items-center gap-2">
+                🌞 লাঞ্চ Extra Option <span className="text-[10px] font-normal text-muted-foreground">(ঐচ্ছিক)</span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {EXTRA_OPTIONS.map(o => (
+                  <label 
+                    key={`l-${o.value}`} 
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-[11px] cursor-pointer transition-all duration-300 ${
+                      selectedExtrasLunch.includes(o.value)
+                        ? 'bg-primary/10 border-primary/45 text-primary shadow-sm shadow-primary/5'
+                        : 'bg-background/40 border-transparent hover:border-primary/20 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={selectedExtrasLunch.includes(o.value)}
+                      onCheckedChange={(checked) => toggleExtra('lunch', o.value, !!checked)}
+                      disabled={cutoff}
+                      className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                    <span className="font-bengali leading-tight">{o.label}</span>
+                  </label>
+                ))}
               </div>
-            )}
+              {selectedExtrasLunch.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1.5 border-t border-primary/10">
+                  {selectedExtrasLunch.map(v => {
+                    const opt = EXTRA_OPTIONS.find(o => o.value === v);
+                    return <Badge key={v} className="font-bengali text-[9px] bg-primary/20 text-primary border-0 hover:bg-primary/30">{opt?.label}</Badge>;
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Dinner Extra Options */}
+            <div className="p-4 rounded-2xl border border-info/20 bg-gradient-to-br from-info/5 via-transparent to-transparent space-y-3 shadow-sm shadow-info/5">
+              <Label className="font-bengali font-semibold text-xs text-info flex items-center gap-2">
+                🌙 ডিনার Extra Option <span className="text-[10px] font-normal text-muted-foreground">(ঐচ্ছিক)</span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {EXTRA_OPTIONS.map(o => (
+                  <label 
+                    key={`d-${o.value}`} 
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-[11px] cursor-pointer transition-all duration-300 ${
+                      selectedExtrasDinner.includes(o.value)
+                        ? 'bg-info/10 border-info/45 text-info shadow-sm shadow-info/5'
+                        : 'bg-background/40 border-transparent hover:border-info/20 hover:bg-info/5 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={selectedExtrasDinner.includes(o.value)}
+                      onCheckedChange={(checked) => toggleExtra('dinner', o.value, !!checked)}
+                      disabled={cutoff}
+                      className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-info data-[state=checked]:border-info"
+                    />
+                    <span className="font-bengali leading-tight">{o.label}</span>
+                  </label>
+                ))}
+              </div>
+              {selectedExtrasDinner.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1.5 border-t border-info/10">
+                  {selectedExtrasDinner.map(v => {
+                    const opt = EXTRA_OPTIONS.find(o => o.value === v);
+                    return <Badge key={v} className="font-bengali text-[9px] bg-info/20 text-info border-0 hover:bg-info/30">{opt?.label}</Badge>;
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

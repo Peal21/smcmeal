@@ -185,9 +185,10 @@ export default function MealOverview() {
   const filteredProfiles = sortByRoll(profiles.filter(p => !searchQuery || p.full_name.toLowerCase().includes(searchQuery.toLowerCase())));
   const canEdit = isManager || isAdmin;
 
-  const managerToggleExtra = async (userId: string, value: string, checked: boolean) => {
+  const managerToggleExtra = async (userId: string, mealType: 'lunch' | 'dinner', value: string, checked: boolean) => {
     const existing = dateMeals.find(m => m.user_id === userId);
-    let current: string[] = existing?.lunch_extra_option ? Array.from(new Set(existing.lunch_extra_option.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
+    const existingOption = mealType === 'lunch' ? existing?.lunch_extra_option : existing?.dinner_extra_option;
+    let current: string[] = existingOption ? Array.from(new Set(existingOption.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
 
     if (checked) {
       const option = ALL_EXTRA_OPTIONS.find(o => o.value === value);
@@ -201,10 +202,15 @@ export default function MealOverview() {
     }
 
     const stored = current.length > 0 ? current.join(',') : null;
+    const updatePayload = mealType === 'lunch' ? { lunch_extra_option: stored } : { dinner_extra_option: stored };
+    const insertPayload = mealType === 'lunch'
+      ? { user_id: userId, meal_date: selectedDate, lunch_extra_option: stored }
+      : { user_id: userId, meal_date: selectedDate, dinner_extra_option: stored };
+
     if (existing) {
-      await supabase.from('daily_meals').update({ lunch_extra_option: stored }).eq('id', existing.id);
+      await supabase.from('daily_meals').update(updatePayload).eq('id', existing.id);
     } else {
-      await supabase.from('daily_meals').insert({ user_id: userId, meal_date: selectedDate, lunch_extra_option: stored });
+      await supabase.from('daily_meals').insert(insertPayload);
     }
     toast.success('Extra item আপডেট হয়েছে');
     fetchDateMeals();
@@ -309,31 +315,61 @@ export default function MealOverview() {
                         <div className="space-y-1">
                           <p>{p.full_name}</p>
                           {canEdit ? (
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-auto p-1 text-xs font-bengali gap-1">
-                                  <Edit2 className="h-3 w-3" />
-                                  {lunchOptionLabels.length > 0 ? lunchOptionLabels.join(', ') : 'Extra Item'}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-56 p-3">
-                                <p className="text-xs font-bengali font-semibold mb-2">Extra Item নির্বাচন:</p>
-                                <div className="space-y-2">
-                                  {ALL_EXTRA_OPTIONS.map(o => {
-                                    const currentExtras = meal?.lunch_extra_option ? Array.from(new Set(meal.lunch_extra_option.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
-                                    return (
-                                      <label key={o.value} className="flex items-center gap-2 text-sm font-bengali cursor-pointer">
-                                        <Checkbox
-                                          checked={currentExtras.includes(o.value)}
-                                          onCheckedChange={(checked) => managerToggleExtra(p.user_id, o.value, !!checked)}
-                                        />
-                                        {o.label}
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </PopoverContent>
-                            </Popover>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {/* Lunch Extra Item Popover */}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-6 px-1.5 text-[10px] font-bengali gap-1 border-primary/20 hover:bg-primary/5">
+                                    <Edit2 className="h-2.5 w-2.5" />
+                                    L: {lunchOptionLabels.length > 0 ? lunchOptionLabels.join(', ') : 'বাছাই'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-3">
+                                  <p className="text-xs font-bengali font-semibold mb-2">লাঞ্চ Extra Item:</p>
+                                  <div className="space-y-2">
+                                    {ALL_EXTRA_OPTIONS.map(o => {
+                                      const currentExtras = meal?.lunch_extra_option ? Array.from(new Set(meal.lunch_extra_option.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
+                                      return (
+                                        <label key={o.value} className="flex items-center gap-2 text-sm font-bengali cursor-pointer">
+                                          <Checkbox
+                                            checked={currentExtras.includes(o.value)}
+                                            onCheckedChange={(checked) => managerToggleExtra(p.user_id, 'lunch', o.value, !!checked)}
+                                          />
+                                          {o.label}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+
+                              {/* Dinner Extra Item Popover */}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-6 px-1.5 text-[10px] font-bengali gap-1 border-info/20 hover:bg-info/5">
+                                    <Edit2 className="h-2.5 w-2.5" />
+                                    D: {dinnerOptionLabels.length > 0 ? dinnerOptionLabels.join(', ') : 'বাছাই'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-3">
+                                  <p className="text-xs font-bengali font-semibold mb-2">ডিনার Extra Item:</p>
+                                  <div className="space-y-2">
+                                    {ALL_EXTRA_OPTIONS.map(o => {
+                                      const currentExtras = meal?.dinner_extra_option ? Array.from(new Set(meal.dinner_extra_option.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
+                                      return (
+                                        <label key={o.value} className="flex items-center gap-2 text-sm font-bengali cursor-pointer">
+                                          <Checkbox
+                                            checked={currentExtras.includes(o.value)}
+                                            onCheckedChange={(checked) => managerToggleExtra(p.user_id, 'dinner', o.value, !!checked)}
+                                          />
+                                          {o.label}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           ) : (lunchOptionLabels.length > 0 || dinnerOptionLabels.length > 0) ? (
                             <div className="flex flex-wrap gap-1">
                               {lunchOptionLabels.map((label, idx) => (

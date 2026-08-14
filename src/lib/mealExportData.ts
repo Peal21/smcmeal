@@ -127,14 +127,19 @@ export function buildMealExportData(
       totalLunch += lunchCount;
       totalDinner += dinnerCount;
 
-      const rawExtraKeys = (meal?.lunch_extra_option || '')
+      const lunchRawExtraKeys = (meal?.lunch_extra_option || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      const dinnerRawExtraKeys = (meal?.dinner_extra_option || '')
         .split(',')
         .map((value) => value.trim())
         .filter(Boolean);
 
       // Merge extra_option from extra_meals
       const extraMealKeys = extraOptionMap.get(profile.user_id) || [];
-      const allRawKeys = [...rawExtraKeys, ...extraMealKeys];
+      const allRawKeys = [...lunchRawExtraKeys, ...dinnerRawExtraKeys, ...extraMealKeys];
 
       const displayExtraKeys = isFeastDay
         ? allRawKeys
