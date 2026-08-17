@@ -12,21 +12,25 @@ CREATE TABLE IF NOT EXISTS public.meal_off_periods (
 ALTER TABLE public.meal_off_periods ENABLE ROW LEVEL SECURITY;
 
 -- Enable SELECT for owner
+DROP POLICY IF EXISTS "Users can view own meal off periods" ON public.meal_off_periods;
 CREATE POLICY "Users can view own meal off periods" ON public.meal_off_periods
   FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
 -- Enable INSERT for owner
+DROP POLICY IF EXISTS "Users can insert own meal off periods" ON public.meal_off_periods;
 CREATE POLICY "Users can insert own meal off periods" ON public.meal_off_periods
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
 -- Enable DELETE for owner
+DROP POLICY IF EXISTS "Users can delete own meal off periods" ON public.meal_off_periods;
 CREATE POLICY "Users can delete own meal off periods" ON public.meal_off_periods
   FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
 
 -- Enable managers/admins to view and manage all off periods
+DROP POLICY IF EXISTS "Managers and Admins can manage all meal off periods" ON public.meal_off_periods;
 CREATE POLICY "Managers and Admins can manage all meal off periods" ON public.meal_off_periods
   FOR ALL TO authenticated
   USING (

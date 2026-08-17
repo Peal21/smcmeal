@@ -57,13 +57,13 @@ BEGIN
     PERFORM cron.schedule(
       job_name,
       cron_time,
-      $$
+      $cron$
       SELECT net.http_post(
         url := 'https://hcbsbgjlkqugwlkilinq.supabase.co/functions/v1/telegram-meal-reminder',
         headers := '{"Content-Type": "application/json"}'::jsonb,
         body := '{}'::jsonb
       );
-      $$
+      $cron$
     );
   END LOOP;
 
