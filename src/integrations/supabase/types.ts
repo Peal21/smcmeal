@@ -43,6 +43,7 @@ export type Database = {
           signup_enabled: boolean
           telegram_chat_id: string | null
           telegram_enabled: boolean
+          telegram_schedule_times: string[]
           updated_at: string
           updated_by: string | null
         }
@@ -53,6 +54,7 @@ export type Database = {
           signup_enabled?: boolean
           telegram_chat_id?: string | null
           telegram_enabled?: boolean
+          telegram_schedule_times?: string[]
           updated_at?: string
           updated_by?: string | null
         }
@@ -63,6 +65,7 @@ export type Database = {
           signup_enabled?: boolean
           telegram_chat_id?: string | null
           telegram_enabled?: boolean
+          telegram_schedule_times?: string[]
           updated_at?: string
           updated_by?: string | null
         }

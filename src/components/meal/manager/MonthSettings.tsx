@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Settings, Calculator, UserCheck, ShieldCheck, UserPlus, Send, ArrowRightCircle, CalendarDays, Save, History, Plus, Clock } from 'lucide-react';
+import { Settings, Calculator, UserCheck, ShieldCheck, UserPlus, Send, ArrowRightCircle, CalendarDays, Save, History, Plus, Clock, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getMealMonthDateRange } from '@/lib/mealMonth';
 import { sortByRoll } from '@/lib/sortMembers';
@@ -54,6 +54,8 @@ export default function MonthSettings() {
   const [cutoffMinute, setCutoffMinute] = useState(0);
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [telegramScheduleTimes, setTelegramScheduleTimes] = useState<string[]>([]);
+  const [newScheduleTime, setNewScheduleTime] = useState('21:00');
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [newMonthStart, setNewMonthStart] = useState('');
   const [newMonthEnd, setNewMonthEnd] = useState('');
@@ -86,13 +88,14 @@ export default function MonthSettings() {
   }, []);
 
   const fetchAppSettings = useCallback(async () => {
-    const { data } = await supabase.from('app_settings' as any).select('signup_enabled, telegram_chat_id, telegram_enabled, meal_cutoff_hour, meal_cutoff_minute').eq('id', 1).single();
+    const { data } = await supabase.from('app_settings' as any).select('signup_enabled, telegram_chat_id, telegram_enabled, meal_cutoff_hour, meal_cutoff_minute, telegram_schedule_times').eq('id', 1).single();
     if (data) {
       setSignupEnabled((data as any).signup_enabled);
       setTelegramChatId((data as any).telegram_chat_id || '');
       setTelegramEnabled((data as any).telegram_enabled ?? true);
       setCutoffHour((data as any).meal_cutoff_hour ?? 22);
       setCutoffMinute((data as any).meal_cutoff_minute ?? 0);
+      setTelegramScheduleTimes((data as any).telegram_schedule_times || ['21:00', '21:30', '21:55']);
     }
   }, []);
 
@@ -336,10 +339,30 @@ export default function MonthSettings() {
     toast.success('নতুন ম্যানেজার নির্ধারণ হয়েছে');
   };
 
-  const saveTelegramChatId = async () => {
-    const { error } = await supabase.from('app_settings' as any).update({ telegram_chat_id: telegramChatId || null, updated_at: new Date().toISOString(), updated_by: user?.id } as any).eq('id', 1);
+  const saveTelegramSettings = async () => {
+    const { error } = await supabase.from('app_settings' as any).update({ 
+      telegram_chat_id: telegramChatId || null, 
+      telegram_schedule_times: telegramScheduleTimes,
+      updated_at: new Date().toISOString(), 
+      updated_by: user?.id 
+    } as any).eq('id', 1);
     if (error) toast.error(error.message);
-    else toast.success('Telegram Chat ID সেভ হয়েছে');
+    else toast.success('Telegram সেটিংস সেভ হয়েছে');
+  };
+
+  const addScheduleTime = () => {
+    if (!newScheduleTime) return;
+    if (telegramScheduleTimes.includes(newScheduleTime)) {
+      toast.error('এই সময়টি ইতিমধ্যে যুক্ত আছে');
+      return;
+    }
+    const updated = [...telegramScheduleTimes, newScheduleTime].sort();
+    setTelegramScheduleTimes(updated);
+  };
+
+  const removeScheduleTime = (timeToRemove: string) => {
+    const updated = telegramScheduleTimes.filter(t => t !== timeToRemove);
+    setTelegramScheduleTimes(updated);
   };
 
   const toggleTelegramEnabled = async (val: boolean) => {
@@ -614,11 +637,56 @@ export default function MonthSettings() {
                 <Label className="font-bengali">Telegram Group Chat ID</Label>
                 <Input value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} placeholder="-100xxxxxxxxxx" />
                 <p className="text-xs text-muted-foreground font-bengali mt-1">
-                  Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান। রাত ৯:০০, ৯:৩০ এবং ৯:৫৫ মিনিটে মিল আপডেটের রিমাইন্ডার যাবে।
+                  Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান।
                 </p>
               </div>
-              <Button onClick={saveTelegramChatId} className="font-bengali gap-1">
-                <Send className="h-4 w-4" /> Chat ID সেভ করুন
+
+              <div className="space-y-2 border-t border-border/30 pt-3">
+                <Label className="font-bengali">রিমাইন্ডার পাঠানোর সময়সমূহ</Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {telegramScheduleTimes.length === 0 ? (
+                    <span className="text-xs text-muted-foreground font-bengali">কোনো সময় সেট করা নেই</span>
+                  ) : (
+                    telegramScheduleTimes.map((time) => (
+                      <Badge key={time} variant="secondary" className="flex items-center gap-1.5 py-1 px-2.5 font-sans text-sm">
+                        {time}
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-4 w-4 p-0 text-muted-foreground hover:text-destructive rounded-full"
+                          onClick={() => removeScheduleTime(time)}
+                          type="button"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input 
+                    type="time" 
+                    value={newScheduleTime} 
+                    onChange={(e) => setNewScheduleTime(e.target.value)} 
+                    className="max-w-[150px] font-sans"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={addScheduleTime}
+                    className="font-bengali flex items-center gap-1"
+                  >
+                    <Plus className="h-4 w-4" /> সময় যোগ করুন
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground font-bengali mt-1">
+                  এখানে সেট করা সময়গুলোতে (বাংলাদেশ সময় অনুযায়ী) স্বয়ংক্রিয়ভাবে Telegram-এ মিল আপদেশের রিমাইন্ডার যাবে।
+                </p>
+              </div>
+
+              <Button onClick={saveTelegramSettings} className="font-bengali gap-1">
+                <Save className="h-4 w-4" /> সেটিংস সেভ করুন
               </Button>
             </CardContent>
           </Card>

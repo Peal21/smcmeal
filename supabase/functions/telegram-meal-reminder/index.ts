@@ -160,8 +160,20 @@ Deno.serve(async (req) => {
       extraCounts[key] = 0;
     });
 
-    const onLines: string[] = [];
-    const offLines: string[] = [];
+    const YEAR_ORDER = ['5th', '4th', '3rd', '2nd', '1st', 'extra'];
+    const YEAR_LABELS: Record<string, string> = {
+      '5th': '৫ম বর্ষ (5th Year)',
+      '4th': '৪র্থ বর্ষ (4th Year)',
+      '3rd': '৩য় বর্ষ (3rd Year)',
+      '2nd': '২য় বর্ষ (2nd Year)',
+      '1st': '১ম বর্ষ (1st Year)',
+      'extra': 'অতিরিক্ত (Extra)',
+    };
+
+    const groupedLines = new Map<string, string[]>();
+    YEAR_ORDER.forEach(y => groupedLines.set(y, []));
+
+    const warnings: string[] = [];
     let updatedCount = 0;
     let notUpdatedCount = 0;
     let totalLunch = 0;
@@ -169,12 +181,15 @@ Deno.serve(async (req) => {
     let totalExtraLunch = 0;
     let totalExtraDinner = 0;
 
-    profiles.forEach((p: any, idx: number) => {
+    profiles.forEach((p: any) => {
       const meal = tomorrowMap.get(p.user_id);
       const todayMeal = todayMap.get(p.user_id);
       const extra = extraMap.get(p.user_id);
       const rollLabel = p.roll_number || '—';
       const shortName = p.full_name.split(' ').slice(0, 2).join(' ');
+
+      const userYear = p.year || 'extra';
+      const yearLines = groupedLines.get(userYear) || [];
 
       if (meal) {
         updatedCount++;
@@ -219,20 +234,12 @@ Deno.serve(async (req) => {
           return count > 1 ? `${count}×${label}` : label;
         });
         const allExtra = [...countedLabels, ...specialLabels];
-        const extraText = allExtra.length > 0 ? `\n   🍖 ${allExtra.join(' · ')}` : '';
+        const extraText = allExtra.length > 0 ? ` (🍖 ${allExtra.join(' · ')})` : '';
 
-        // Build member line
-        onLines.push(
-          `${String(idx + 1).padStart(2, ' ')}. <b>${shortName}</b> [${rollLabel}]\n   ☀️ L: ${lunchStr}  🌙 D: ${dinnerStr}${extraText}`
+        // Build member line in table format
+        yearLines.push(
+          `  • [${rollLabel}] <b>${shortName}</b> ➔ L: ${lunchStr} · D: ${dinnerStr}${extraText}`
         );
-
-        // Track who turned off a meal
-        if (!meal.lunch || !meal.dinner) {
-          const offParts: string[] = [];
-          if (!meal.lunch) offParts.push('লাঞ্চ ❌');
-          if (!meal.dinner) offParts.push('ডিনার ❌');
-          offLines.push(`⚡ <b>${shortName}</b> — ${offParts.join(', ')} বন্ধ করেছে`);
-        }
       } else {
         notUpdatedCount++;
         let extraInfo = '';
@@ -240,20 +247,25 @@ Deno.serve(async (req) => {
           const wasLunchOn = todayMeal.lunch;
           const wasDinnerOn = todayMeal.dinner;
           if (wasLunchOn && wasDinnerOn) {
-            extraInfo = ' (আজ L✅ D✅ ছিল)';
+            extraInfo = ' (আজ L✅ D✅)';
           } else if (wasLunchOn) {
-            extraInfo = ' (আজ শুধু L✅ ছিল)';
+            extraInfo = ' (আজ L✅)';
           } else if (wasDinnerOn) {
-            extraInfo = ' (আজ শুধু D✅ ছিল)';
+            extraInfo = ' (আজ D✅)';
           } else {
-            extraInfo = ' (আজও বন্ধ ছিল)';
+            extraInfo = ' (আজও বন্ধ)';
+            // Today meals were off, and user did not update for tomorrow
+            warnings.push(p.full_name);
           }
+        } else {
+          warnings.push(p.full_name);
         }
 
-        onLines.push(
-          `${String(idx + 1).padStart(2, ' ')}. 🔴 <b>${shortName}</b> [${rollLabel}] — আপডেট দেয়নি${extraInfo}`
+        yearLines.push(
+          `  • [${rollLabel}] 🔴 <b>${shortName}</b> ➔ আপডেট দেয়নি${extraInfo}`
         );
       }
+      groupedLines.set(userYear, yearLines);
     });
 
     // ──── Build the beautiful message ────
@@ -309,19 +321,33 @@ Deno.serve(async (req) => {
     });
 
     if (extraLines) {
+      message += `\n🍳 <b>অতিরিক্ত অপশন সমূহের যোগফল:</b>\n`;
+      message += extraLines;
+    }
+
+    // Build the grouped member list section
+    let memberListMessage = '';
+    YEAR_ORDER.forEach((year) => {
+      const yearLines = groupedLines.get(year) || [];
+      if (yearLines.length > 0) {
+        memberListMessage += `\n🎓 <b>${YEAR_LABELS[year]}:</b>\n`;
+        memberListMessage += yearLines.join('\n') + '\n';
+      }
+    });
+
     message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `<b>👤 সদস্য তালিকা (Roll অনুযায়ী):</b>\n`;
+    message += `<b>👤 সদস্য তালিকা (ব্যাচ অনুযায়ী):</b>\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
-    message += lines.join('\n');
+    message += memberListMessage;
 
     if (warnings.length > 0) {
-      message += `\n\n🚨 <b>সতর্কতা! আজ OFF ছিল কিন্তু আগামীকালের আপডেট দেয়নি:</b>\n`;
+      message += `\n🚨 <b>সতর্কতা! আজ OFF ছিল কিন্তু আগামীকালের আপডেট দেয়নি:</b>\n`;
       warnings.forEach((name) => { message += `⚠️ ${name}\n`; });
     }
 
     message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     if (notUpdatedCount > 0) {
-      message += `⚠️ <i>মিল আপডেট দিন! রাত ১০টার পর বন্ধ হয়ে যাবে।</i>`;
+      message += `⚠️ <i>মিল আপডেট দিন! রাত ১০тар পর বন্ধ হয়ে যাবে।</i>`;
     } else {
       message += `🎉 <i>সবাই সফলভাবে মিল আপডেট সম্পন্ন করেছেন!</i>`;
     }
