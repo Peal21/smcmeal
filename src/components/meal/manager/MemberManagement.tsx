@@ -16,7 +16,7 @@ import AdminDeleteConfirm from './AdminDeleteConfirm';
 import { sortByRoll } from '@/lib/sortMembers';
 
 export default function MemberManagement() {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, isManager } = useAuth();
   const [members, setMembers] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [filterYear, setFilterYear] = useState('all');
@@ -137,10 +137,30 @@ export default function MemberManagement() {
         if (editPassword.trim().length < 6) {
           throw new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
         }
-        const { data: pData, error: pError } = await supabase.functions.invoke('admin-reset-password', {
-          body: { target_user_id: editMember.user_id, new_password: editPassword.trim() },
+        let pRes = await supabase.functions.invoke('password-reset-otp', {
+          body: {
+            action: 'admin_reset',
+            target_user_id: editMember.user_id,
+            profile_id: editMember.id,
+            caller_user_id: user?.id,
+            new_password: editPassword.trim(),
+          },
         });
-        if (pError || pData?.error) throw new Error(pError?.message || pData?.error);
+        if (pRes.error || pRes.data?.error) {
+          const fallbackPRes = await supabase.functions.invoke('admin-reset-password', {
+            body: {
+              target_user_id: editMember.user_id,
+              profile_id: editMember.id,
+              new_password: editPassword.trim(),
+            },
+          });
+          if (!fallbackPRes.error && !fallbackPRes.data?.error) {
+            pRes = fallbackPRes;
+          }
+        }
+        if (pRes.error || pRes.data?.error) {
+          throw new Error(pRes.error?.message || pRes.data?.error || 'পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে');
+        }
         toast.success(`${editName}-এর তথ্য ও নতুন পাসওয়ার্ড আপডেট হয়েছে!`);
       } else {
         toast.success(`${editName} আপডেট হয়েছে`);
@@ -192,11 +212,33 @@ export default function MemberManagement() {
     if (resetPassword !== resetConfirmPassword) { toast.error('পাসওয়ার্ড মিলছে না!'); return; }
     setResetLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-        body: { target_user_id: resetMember.user_id, new_password: resetPassword },
+      // 1. Invoke password-reset-otp with action: admin_reset
+      let res = await supabase.functions.invoke('password-reset-otp', {
+        body: {
+          action: 'admin_reset',
+          target_user_id: resetMember.user_id,
+          profile_id: resetMember.id,
+          caller_user_id: user?.id,
+          new_password: resetPassword,
+        },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+
+      // 2. Fallback to admin-reset-password if needed
+      if (res.error || res.data?.error) {
+        const fallbackRes = await supabase.functions.invoke('admin-reset-password', {
+          body: {
+            target_user_id: resetMember.user_id,
+            profile_id: resetMember.id,
+            new_password: resetPassword,
+          },
+        });
+        if (!fallbackRes.error && !fallbackRes.data?.error) {
+          res = fallbackRes;
+        }
+      }
+
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
       
       setResetSuccessData({
         memberName: resetMember.full_name,

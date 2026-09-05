@@ -278,8 +278,102 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ─── ADMIN RESET PASSWORD DIRECT ───
+    if (action === "admin_reset") {
+      const authHeader = req.headers.get("Authorization");
+      let callerId = body.caller_user_id;
+
+      if (authHeader) {
+        try {
+          const supabaseClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_ANON_KEY")!,
+            { global: { headers: { Authorization: authHeader } } }
+          );
+          const { data: { user: caller } } = await supabaseClient.auth.getUser();
+          if (caller?.id) callerId = caller.id;
+        } catch (e) {
+          console.warn("Caller auth check exception:", e);
+        }
+      }
+
+      if (!callerId) {
+        return new Response(
+          JSON.stringify({ error: "অননুমোদিত অ্যাক্সেস — অনুগ্রহ করে লগইন করুন" }),
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
+      // Verify caller is admin or meal manager
+      const { data: roles } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", callerId);
+
+      const isAdmin = roles?.some(
+        (r: any) => r.role === "meal_manager" || r.role === "super_admin"
+      );
+
+      if (!isAdmin) {
+        return new Response(
+          JSON.stringify({ error: "অনুমতি নেই — শুধু মিল ম্যানেজার বা সুপার অ্যাডমিন পাসওয়ার্ড পরিবর্তন করতে পারেন।" }),
+          { status: 403, headers: corsHeaders }
+        );
+      }
+
+      let targetUserId = body.target_user_id;
+      const newPassword = body.new_password;
+
+      if (!targetUserId && body.email) {
+        const { data: userList } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const found = userList?.users?.find((u: any) => u.email?.toLowerCase() === body.email?.toLowerCase().trim());
+        if (found) targetUserId = found.id;
+      }
+
+      if (!targetUserId && body.profile_id) {
+        const { data: p } = await supabaseAdmin.from("profiles").select("user_id").eq("id", body.profile_id).maybeSingle();
+        if (p?.user_id) targetUserId = p.user_id;
+      }
+
+      if (!targetUserId || !newPassword) {
+        return new Response(
+          JSON.stringify({ error: "target_user_id এবং new_password আবশ্যক" }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      if (newPassword.length < 6) {
+        return new Response(
+          JSON.stringify({ error: "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে" }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      // Update target user's password in auth.users
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUserId,
+        { password: newPassword }
+      );
+
+      if (updateError) {
+        console.error("updateUserById error:", updateError);
+        return new Response(
+          JSON.stringify({ error: updateError.message || "পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে" }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে",
+        }),
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ error: "Invalid action. Use 'generate' or 'verify'" }),
+      JSON.stringify({ error: "Invalid action. Use 'generate', 'verify', or 'admin_reset'" }),
       { status: 400, headers: corsHeaders }
     );
   } catch (err: any) {
@@ -290,4 +384,5 @@ Deno.serve(async (req) => {
     );
   }
 });
+
 

@@ -18,3 +18,8 @@ verify_jwt = false
 [functions.send-meal-update-email]
 verify_jwt = false
 
+[functions.admin-reset-password]
+verify_jwt = false
+
+
+
