@@ -185,6 +185,21 @@ export default function Auth() {
     setResendTimer(0);
   };
 
+  const extractEdgeError = async (error: any, data?: any): Promise<string> => {
+    if (data?.error) return data.error;
+    if (error) {
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          if (body?.error) return body.error;
+          if (body?.message) return body.message;
+        } catch {}
+      }
+      return error.message || 'অনুরোধ ব্যর্থ হয়েছে';
+    }
+    return 'সমস্যা হয়েছে, পুনরায় চেষ্টা করুন';
+  };
+
   const handleForgotSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = forgotEmail.trim();
@@ -194,8 +209,9 @@ export default function Auth() {
       const { data, error } = await supabase.functions.invoke('password-reset-otp', {
         body: { action: 'generate', identifier: query, email: query },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) {
+        throw new Error(await extractEdgeError(error, data));
+      }
 
       if (data?.email) {
         setForgotEmail(data.email);
@@ -231,8 +247,9 @@ export default function Auth() {
       const { data, error } = await supabase.functions.invoke('password-reset-otp', {
         body: { action: 'generate', identifier: query, email: query },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) {
+        throw new Error(await extractEdgeError(error, data));
+      }
 
       if (data?.email) {
         setForgotEmail(data.email);
@@ -266,8 +283,9 @@ export default function Auth() {
           new_password: newPassword,
         },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) {
+        throw new Error(await extractEdgeError(error, data));
+      }
       toast.success('পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে! এখন নতুন পাসওয়ার্ড দিয়ে লগইন করুন।', { duration: 8000 });
       playSuccessSound();
       setLoginEmail(forgotEmail);

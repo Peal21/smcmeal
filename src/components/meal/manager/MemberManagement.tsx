@@ -137,30 +137,7 @@ export default function MemberManagement() {
         if (editPassword.trim().length < 6) {
           throw new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
         }
-        let pRes = await supabase.functions.invoke('password-reset-otp', {
-          body: {
-            action: 'admin_reset',
-            target_user_id: editMember.user_id,
-            profile_id: editMember.id,
-            caller_user_id: user?.id,
-            new_password: editPassword.trim(),
-          },
-        });
-        if (pRes.error || pRes.data?.error) {
-          const fallbackPRes = await supabase.functions.invoke('admin-reset-password', {
-            body: {
-              target_user_id: editMember.user_id,
-              profile_id: editMember.id,
-              new_password: editPassword.trim(),
-            },
-          });
-          if (!fallbackPRes.error && !fallbackPRes.data?.error) {
-            pRes = fallbackPRes;
-          }
-        }
-        if (pRes.error || pRes.data?.error) {
-          throw new Error(pRes.error?.message || pRes.data?.error || 'পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে');
-        }
+        await callAdminResetPassword(editMember.user_id, editMember.id, editPassword.trim());
         toast.success(`${editName}-এর তথ্য ও নতুন পাসওয়ার্ড আপডেট হয়েছে!`);
       } else {
         toast.success(`${editName} আপডেট হয়েছে`);
@@ -206,39 +183,57 @@ export default function MemberManagement() {
     toast.info(`পাসওয়ার্ড বসানো হয়েছে: ${pass}`);
   };
 
+  const callAdminResetPassword = async (targetUserId: string, profileId: string, newPasswordStr: string) => {
+    // 1. Try admin-reset-password first
+    let res = await supabase.functions.invoke('admin-reset-password', {
+      body: {
+        target_user_id: targetUserId,
+        profile_id: profileId,
+        new_password: newPasswordStr,
+      },
+    });
+
+    // 2. If it fails, fallback to password-reset-otp with action: admin_reset
+    if (res.error || res.data?.error) {
+      const fallbackRes = await supabase.functions.invoke('password-reset-otp', {
+        body: {
+          action: 'admin_reset',
+          target_user_id: targetUserId,
+          profile_id: profileId,
+          caller_user_id: user?.id,
+          new_password: newPasswordStr,
+        },
+      });
+      if (!fallbackRes.error && !fallbackRes.data?.error) {
+        res = fallbackRes;
+      }
+    }
+
+    if (res.error) {
+      let errMsg = res.error.message;
+      if (res.error.context && typeof res.error.context.json === 'function') {
+        try {
+          const errBody = await res.error.context.json();
+          if (errBody?.error) errMsg = errBody.error;
+        } catch {}
+      }
+      throw new Error(errMsg || 'পাসওয়ার্ড পরিবর্তন করতে সমস্যা হয়েছে');
+    }
+
+    if (res.data?.error) {
+      throw new Error(res.data.error);
+    }
+
+    return res.data;
+  };
+
   const handleResetPassword = async () => {
     if (!resetMember) return;
     if (resetPassword.length < 6) { toast.error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে'); return; }
     if (resetPassword !== resetConfirmPassword) { toast.error('পাসওয়ার্ড মিলছে না!'); return; }
     setResetLoading(true);
     try {
-      // 1. Invoke password-reset-otp with action: admin_reset
-      let res = await supabase.functions.invoke('password-reset-otp', {
-        body: {
-          action: 'admin_reset',
-          target_user_id: resetMember.user_id,
-          profile_id: resetMember.id,
-          caller_user_id: user?.id,
-          new_password: resetPassword,
-        },
-      });
-
-      // 2. Fallback to admin-reset-password if needed
-      if (res.error || res.data?.error) {
-        const fallbackRes = await supabase.functions.invoke('admin-reset-password', {
-          body: {
-            target_user_id: resetMember.user_id,
-            profile_id: resetMember.id,
-            new_password: resetPassword,
-          },
-        });
-        if (!fallbackRes.error && !fallbackRes.data?.error) {
-          res = fallbackRes;
-        }
-      }
-
-      if (res.error) throw res.error;
-      if (res.data?.error) throw new Error(res.data.error);
+      await callAdminResetPassword(resetMember.user_id, resetMember.id, resetPassword);
       
       setResetSuccessData({
         memberName: resetMember.full_name,
