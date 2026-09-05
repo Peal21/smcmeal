@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, Loader2 } from 'lucide-react';
+import { KeyRound, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'checking' | 'ready' | 'invalid'>('checking');
   const navigate = useNavigate();
@@ -115,11 +117,43 @@ export default function ResetPassword() {
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div>
               <Label className="font-bengali">নতুন পাসওয়ার্ড</Label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+              <div className="relative mt-1">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <Label className="font-bengali">পাসওয়ার্ড নিশ্চিত করুন</Label>
-              <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6} />
+              <div className="relative mt-1">
+                <Input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full font-bengali" disabled={loading}>
               {loading ? 'লোড হচ্ছে...' : 'পাসওয়ার্ড পরিবর্তন করুন'}
@@ -130,3 +164,4 @@ export default function ResetPassword() {
     </div>
   );
 }
+

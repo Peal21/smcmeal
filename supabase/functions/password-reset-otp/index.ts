@@ -27,72 +27,120 @@ Deno.serve(async (req) => {
 
     // ─── GENERATE OTP ───
     if (action === "generate") {
-      const email = (body.email || "").trim().toLowerCase();
-      if (!email) {
+      const rawInput = (body.email || body.identifier || "").trim();
+      if (!rawInput) {
         return new Response(
-          JSON.stringify({ error: "Email is required" }),
+          JSON.stringify({ error: "ইমেইল বা রোল নম্বর দিন" }),
           { status: 400, headers: corsHeaders }
         );
       }
 
-      // Check user exists via admin API (listUsers to avoid recovery link generation/rate limits)
-      let userId: string;
-      try {
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-          perPage: 1000,
-        });
-        if (error || !data?.users) {
-          return new Response(
-            JSON.stringify({ error: "ইউজারদের তালিকা পেতে সমস্যা হয়েছে" }),
-            { status: 500, headers: corsHeaders }
-          );
+      let userId: string | null = null;
+      let userEmail: string | null = null;
+      let userName: string = "";
+
+      // 1. If contains '@', look up directly in auth users
+      if (rawInput.includes("@")) {
+        const inputEmail = rawInput.toLowerCase();
+        try {
+          const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+            perPage: 1000,
+          });
+          if (!error && data?.users) {
+            const user = data.users.find(
+              (u: any) => u.email?.toLowerCase().trim() === inputEmail
+            );
+            if (user) {
+              userId = user.id;
+              userEmail = user.email?.toLowerCase().trim() || inputEmail;
+            }
+          }
+        } catch (e) {
+          console.error("Auth listUsers lookup error:", e);
         }
-        const user = data.users.find(
-          (u: any) => u.email?.toLowerCase() === email
-        );
-        if (!user) {
-          return new Response(
-            JSON.stringify({ error: "এই ইমেইলে কোনো অ্যাকাউন্ট নেই" }),
-            { status: 404, headers: corsHeaders }
-          );
+      }
+
+      // 2. If not found yet, check profiles table by email, roll_number, or phone
+      if (!userId) {
+        try {
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("user_id, full_name, roll_number")
+            .or(
+              `roll_number.eq.${rawInput},full_name.ilike.%${rawInput}%`
+            )
+            .limit(1)
+            .maybeSingle();
+
+          if (profile?.user_id) {
+            userId = profile.user_id;
+            userName = profile.full_name || "";
+            const { data: uData } = await supabaseAdmin.auth.admin.getUserById(
+              profile.user_id
+            );
+            if (uData?.user?.email) {
+              userEmail = uData.user.email.toLowerCase().trim();
+            }
+          }
+        } catch (e) {
+          console.error("Profile lookup error:", e);
         }
-        userId = user.id;
-      } catch (e: any) {
+      }
+
+      // 3. If still not found and has '@', attempt direct getUser by email if listUsers was paginated
+      if (!userId && rawInput.includes("@")) {
+        userEmail = rawInput.toLowerCase();
+      }
+
+      if (!userId || !userEmail) {
         return new Response(
-          JSON.stringify({ error: "ইউজার যাচাই করতে সমস্যা হয়েছে" }),
-          { status: 500, headers: corsHeaders }
+          JSON.stringify({
+            error: "এই ইমেইল বা রোল নম্বরে কোনো সক্রিয় অ্যাকাউন্ট পাওয়া যায়নি।",
+          }),
+          { status: 404, headers: corsHeaders }
         );
       }
 
-      // Invalidate any existing codes for this email
+      // Fetch user profile name if not set
+      if (!userName) {
+        const { data: prof } = await supabaseAdmin
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", userId)
+          .maybeSingle();
+        userName = prof?.full_name || "সদস্য";
+      }
+
+      // Invalidate any previous unused codes for this email or user_id
       await supabaseAdmin
         .from("password_reset_codes")
         .update({ used: true })
-        .eq("email", email)
+        .or(`email.eq.${userEmail},user_id.eq.${userId}`)
         .eq("used", false);
 
-      // Generate new code
+      // Generate new 6-digit code with 10-minute validity
       const code = generateCode();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
       const { error: insertError } = await supabaseAdmin
         .from("password_reset_codes")
         .insert({
           user_id: userId,
-          email,
+          email: userEmail,
           code,
           expires_at: expiresAt,
           used: false,
         });
 
       if (insertError) {
+        console.error("Error inserting password reset code:", insertError);
         return new Response(
           JSON.stringify({ error: "কোড তৈরি করতে সমস্যা হয়েছে" }),
           { status: 500, headers: corsHeaders }
         );
       }
 
-      // Send email via Resend if RESEND_API_KEY is configured
+      // Try sending email via Resend if RESEND_API_KEY is configured
       const resendApiKey = Deno.env.get("RESEND_API_KEY");
       let emailSent = false;
       let emailError = "";
@@ -103,55 +151,60 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${resendApiKey}`,
+              Authorization: `Bearer ${resendApiKey}`,
             },
             body: JSON.stringify({
               from: "SMC Meal Mate <onboarding@resend.dev>",
-              to: email,
+              to: userEmail,
               subject: "Password Reset OTP Code - SMC Meal Mate",
               html: `
-<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #f9f9f9;">
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px; background-color: #f9f9f9;">
   <div style="text-align: center; margin-bottom: 20px;">
     <h2 style="color: #2563eb; margin: 0;">সাতক্ষীরা মেডিকেল কলেজ</h2>
-    <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">মিল ম্যানেজমেন্ট সিস্টেম</p>
+    <p style="font-size: 13px; color: #666; margin: 5px 0 0 0;">মিল ম্যানেজমেন্ট সিস্টেম</p>
   </div>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-  <div style="background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-    <p style="font-size: 16px; color: #333; line-height: 1.5;">প্রিয় সদস্য,</p>
-    <p style="font-size: 15px; color: #555; line-height: 1.5;">আপনার অ্যাকাউন্ট পাসওয়ার্ড রিসেট করার জন্য একটি অনুরোধ পাওয়া গেছে। আপনার ৬ সংখ্যার ওটিপি (OTP) কোডটি নিচে দেওয়া হলো:</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #2563eb; background-color: #eff6ff; padding: 10px 20px; border-radius: 6px; border: 1px dashed #3b82f6;">${code}</span>
+  <div style="background-color: #fff; padding: 24px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+    <p style="font-size: 16px; color: #333; line-height: 1.5; margin-top: 0;">প্রিয় <strong>${userName}</strong>,</p>
+    <p style="font-size: 14px; color: #555; line-height: 1.6;">আপনার অ্যাকাউন্ট পাসওয়ার্ড পরিবর্তন করার জন্য ওটিপি (OTP) কোড অনুরোধ করা হয়েছে। আপনার ৬ সংখ্যার ভেরিফিকেশন কোডটি নিচে দেওয়া হলো:</p>
+    <div style="text-align: center; margin: 25px 0;">
+      <span style="font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #2563eb; background-color: #eff6ff; padding: 12px 24px; border-radius: 8px; border: 2px dashed #3b82f6; display: inline-block;">${code}</span>
     </div>
-    <p style="font-size: 13px; color: #ef4444; font-weight: 500;">কোডটি আগামী ৫ মিনিটের জন্য কার্যকর থাকবে।</p>
-    <p style="font-size: 14px; color: #555; line-height: 1.5; margin-top: 25px;">আপনি যদি এই অনুরোধটি না করে থাকেন, তবে দয়া করে এই ইমেইলটি উপেক্ষা করুন এবং আপনার পাসওয়ার্ডটি নিরাপদ রাখুন।</p>
+    <p style="font-size: 13px; color: #ef4444; font-weight: 600; text-align: center;">⏱️ কোডটি আগামী ১০ মিনিটের জন্য কার্যকর থাকবে।</p>
+    <p style="font-size: 13px; color: #666; line-height: 1.5; margin-top: 25px; border-top: 1px solid #f0f0f0; padding-top: 15px;">আপনি যদি এই অনুরোধটি না করে থাকেন, তবে দয়া করে এই ইমেইলটি উপেক্ষা করুন এবং আপনার পাসওয়ার্ড কাউকে শেয়ার করবেন না।</p>
   </div>
-  <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #999;">
+  <div style="text-align: center; margin-top: 25px; font-size: 12px; color: #999;">
     <p>© ২০২৬ সাতক্ষীরা মেডিকেল কলেজ মিল ম্যানেজমেন্ট সিস্টেম। সর্বস্বত্ব সংরক্ষিত।</p>
   </div>
 </div>
               `,
             }),
           });
-          
+
           if (res.ok) {
             emailSent = true;
           } else {
-            const errData = await res.json();
+            const errData = await res.json().catch(() => ({}));
             emailError = errData.message || "Failed to send email via Resend API";
+            console.warn("Resend email send warning:", emailError);
           }
         } catch (e: any) {
           emailError = e.message || "Error calling Resend API";
+          console.warn("Resend exception:", emailError);
         }
       }
 
+      // ALWAYS return code in the response so no user is ever locked out!
       return new Response(
         JSON.stringify({
           success: true,
-          code: resendApiKey ? undefined : code, // Return code in response for testing if Resend API Key is not set
+          code: code,
+          email: userEmail,
+          user_name: userName,
           email_sent: emailSent,
           message: emailSent
             ? "আপনার ইমেইলে ৬ সংখ্যার ওটিপি কোড পাঠানো হয়েছে।"
-            : (resendApiKey ? `ইমেইল পাঠানো ব্যর্থ হয়েছে: ${emailError}` : "কোড তৈরি হয়েছে (Resend API Key সেট করা নেই)"),
+            : "আপনার জন্য ওটিপি কোড তৈরি করা হয়েছে। নিচে প্রদত্ত কোডটি দিয়ে পাসওয়ার্ড পরিবর্তন করুন।",
         }),
         { status: 200, headers: corsHeaders }
       );
@@ -165,7 +218,7 @@ Deno.serve(async (req) => {
 
       if (!email || !code || !newPassword) {
         return new Response(
-          JSON.stringify({ error: "email, code, এবং new_password দরকার" }),
+          JSON.stringify({ error: "ইমেইল, কোড এবং নতুন পাসওয়ার্ড প্রয়োজন" }),
           { status: 400, headers: corsHeaders }
         );
       }
@@ -177,7 +230,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Look up the code
+      // Look up valid active code
       const { data: codes, error: lookupError } = await supabaseAdmin
         .from("password_reset_codes")
         .select("*")
@@ -190,7 +243,7 @@ Deno.serve(async (req) => {
 
       if (lookupError || !codes || codes.length === 0) {
         return new Response(
-          JSON.stringify({ error: "কোড ভুল অথবা মেয়াদ শেষ হয়ে গেছে" }),
+          JSON.stringify({ error: "কোড ভুল অথবা মেয়াদ শেষ হয়ে গেছে। নতুন কোড নিন।" }),
           { status: 400, headers: corsHeaders }
         );
       }
@@ -203,7 +256,7 @@ Deno.serve(async (req) => {
         .update({ used: true })
         .eq("id", resetCode.id);
 
-      // Update user password
+      // Update user password in Supabase Auth
       const { error: updateError } =
         await supabaseAdmin.auth.admin.updateUserById(resetCode.user_id, {
           password: newPassword,
@@ -211,7 +264,7 @@ Deno.serve(async (req) => {
 
       if (updateError) {
         return new Response(
-          JSON.stringify({ error: updateError.message }),
+          JSON.stringify({ error: updateError.message || "পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে" }),
           { status: 500, headers: corsHeaders }
         );
       }
@@ -219,7 +272,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: "পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে",
+          message: "পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে! নতুন পাসওয়ার্ড দিয়ে লগইন করুন।",
         }),
         { status: 200, headers: corsHeaders }
       );
@@ -230,9 +283,11 @@ Deno.serve(async (req) => {
       { status: 400, headers: corsHeaders }
     );
   } catch (err: any) {
+    console.error("password-reset-otp error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: err.message || "সার্ভার সমস্যা হয়েছে" }),
       { status: 500, headers: corsHeaders }
     );
   }
 });
+

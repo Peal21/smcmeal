@@ -13,7 +13,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify the caller is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -22,13 +21,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Get the calling user
+    // 1. Get calling user
     const {
       data: { user: caller },
       error: callerError,
@@ -36,71 +40,89 @@ Deno.serve(async (req) => {
 
     if (callerError || !caller) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "অননুমোদিত অ্যাক্সেস (Unauthorized)" }),
         { status: 401, headers: corsHeaders }
       );
     }
 
-    // Check if caller is admin/manager
-    const { data: roles } = await supabaseClient
+    // 2. Check if caller has admin or meal_manager role using service role (bypasses RLS)
+    const { data: roles, error: rolesError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id);
 
+    if (rolesError) {
+      console.error("Role lookup error:", rolesError);
+    }
+
     const isAdmin = roles?.some(
-      (r: any) =>
-        r.role === "meal_manager" || r.role === "super_admin"
+      (r: any) => r.role === "meal_manager" || r.role === "super_admin"
     );
 
     if (!isAdmin) {
       return new Response(
-        JSON.stringify({ error: "Permission denied" }),
+        JSON.stringify({ error: "অনুমতি নেই — শুধু মিল ম্যানেজার বা সুপার অ্যাডমিন পাসওয়ার্ড পরিবর্তন করতে পারেন।" }),
         { status: 403, headers: corsHeaders }
       );
     }
 
-    const { target_user_id, new_password } = await req.json();
+    const body = await req.json();
+    let targetUserId = body.target_user_id;
+    const newPassword = body.new_password;
 
-    if (!target_user_id || !new_password) {
+    if (!targetUserId && body.email) {
+      // Find target user by email
+      const { data: userList } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const found = userList?.users?.find((u: any) => u.email?.toLowerCase() === body.email?.toLowerCase().trim());
+      if (found) targetUserId = found.id;
+    }
+
+    if (!targetUserId && body.profile_id) {
+      const { data: p } = await supabaseAdmin.from("profiles").select("user_id").eq("id", body.profile_id).maybeSingle();
+      if (p?.user_id) targetUserId = p.user_id;
+    }
+
+    if (!targetUserId || !newPassword) {
       return new Response(
-        JSON.stringify({ error: "target_user_id and new_password required" }),
+        JSON.stringify({ error: "target_user_id এবং new_password আবশ্যক" }),
         { status: 400, headers: corsHeaders }
       );
     }
 
-    if (new_password.length < 6) {
+    if (newPassword.length < 6) {
       return new Response(
-        JSON.stringify({ error: "Password must be at least 6 characters" }),
+        JSON.stringify({ error: "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে" }),
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Use service role to update the target user's password
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    // 3. Update target user's password in auth.users
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      targetUserId,
+      { password: newPassword }
     );
 
-    const { error: updateError } =
-      await supabaseAdmin.auth.admin.updateUserById(target_user_id, {
-        password: new_password,
-      });
-
     if (updateError) {
+      console.error("updateUserById error:", updateError);
       return new Response(
-        JSON.stringify({ error: updateError.message }),
+        JSON.stringify({ error: updateError.message || "পাসওয়ার্ড আপডেট করতে সমস্যা হয়েছে" }),
         { status: 500, headers: corsHeaders }
       );
     }
 
     return new Response(
-      JSON.stringify({ message: "Password updated successfully" }),
+      JSON.stringify({
+        success: true,
+        message: "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে",
+      }),
       { status: 200, headers: corsHeaders }
     );
   } catch (err: any) {
+    console.error("admin-reset-password error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: err.message || "সার্ভার সমস্যা হয়েছে" }),
       { status: 500, headers: corsHeaders }
     );
   }
 });
+

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Users, Plus, Trash2, Pencil, KeyRound } from 'lucide-react';
+import { Search, Users, Plus, Trash2, Pencil, KeyRound, Eye, EyeOff, Copy, Check, Sparkles, User } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminDeleteConfirm from './AdminDeleteConfirm';
 import { sortByRoll } from '@/lib/sortMembers';
@@ -40,6 +40,8 @@ export default function MemberManagement() {
   const [editYear, setEditYear] = useState('1st');
   const [editGender, setEditGender] = useState('male');
   const [editRoll, setEditRoll] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   // Reset password
   const [resetOpen, setResetOpen] = useState(false);
@@ -47,6 +49,9 @@ export default function MemberManagement() {
   const [resetMember, setResetMember] = useState<any>(null);
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
+  const [resetSuccessData, setResetSuccessData] = useState<{ memberName: string; password: string } | null>(null);
 
   useEffect(() => {
     fetchMembers();
@@ -107,6 +112,8 @@ export default function MemberManagement() {
     setEditYear(member.year);
     setEditGender(member.gender);
     setEditRoll(member.roll_number || '');
+    setEditPassword('');
+    setShowEditPassword(false);
     setEditOpen(true);
   };
 
@@ -116,19 +123,34 @@ export default function MemberManagement() {
       return;
     }
     setEditLoading(true);
-    const { error } = await supabase.from('profiles').update({
-      full_name: editName.trim(),
-      year: editYear as any,
-      gender: editGender as any,
-      roll_number: editRoll.trim() || null,
-    }).eq('id', editMember.id);
+    try {
+      const { error } = await supabase.from('profiles').update({
+        full_name: editName.trim(),
+        year: editYear as any,
+        gender: editGender as any,
+        roll_number: editRoll.trim() || null,
+      }).eq('id', editMember.id);
 
-    if (error) {
-      toast.error('আপডেট করতে সমস্যা হয়েছে');
-    } else {
-      toast.success(`${editName} আপডেট হয়েছে`);
+      if (error) throw error;
+
+      if (editPassword.trim()) {
+        if (editPassword.trim().length < 6) {
+          throw new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
+        }
+        const { data: pData, error: pError } = await supabase.functions.invoke('admin-reset-password', {
+          body: { target_user_id: editMember.user_id, new_password: editPassword.trim() },
+        });
+        if (pError || pData?.error) throw new Error(pError?.message || pData?.error);
+        toast.success(`${editName}-এর তথ্য ও নতুন পাসওয়ার্ড আপডেট হয়েছে!`);
+      } else {
+        toast.success(`${editName} আপডেট হয়েছে`);
+      }
+
       setEditOpen(false);
+      setEditPassword('');
       fetchMembers();
+    } catch (err: any) {
+      toast.error(err.message || 'আপডেট করতে সমস্যা হয়েছে');
     }
     setEditLoading(false);
   };
@@ -147,7 +169,21 @@ export default function MemberManagement() {
     setResetMember(member);
     setResetPassword('');
     setResetConfirmPassword('');
+    setShowResetPassword(false);
+    setShowResetConfirmPassword(false);
+    setResetSuccessData(null);
     setResetOpen(true);
+  };
+
+  const handleQuickPassword = (preset: string) => {
+    let pass = preset;
+    if (preset === 'random') {
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      pass = `smc${randomNum}`;
+    }
+    setResetPassword(pass);
+    setResetConfirmPassword(pass);
+    toast.info(`পাসওয়ার্ড বসানো হয়েছে: ${pass}`);
   };
 
   const handleResetPassword = async () => {
@@ -161,8 +197,12 @@ export default function MemberManagement() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      
+      setResetSuccessData({
+        memberName: resetMember.full_name,
+        password: resetPassword,
+      });
       toast.success(`${resetMember.full_name}-এর পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে!`);
-      setResetOpen(false);
     } catch (err: any) {
       toast.error(err.message || 'পাসওয়ার্ড পরিবর্তন করতে সমস্যা হয়েছে');
     }
@@ -170,7 +210,7 @@ export default function MemberManagement() {
   };
 
   const filtered = members.filter(m => {
-    if (search && !m.full_name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !m.full_name.toLowerCase().includes(search.toLowerCase()) && !(m.roll_number || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (filterYear !== 'all' && m.year !== filterYear) return false;
     if (filterGender !== 'all' && m.gender !== filterGender) return false;
     return true;
@@ -335,8 +375,10 @@ export default function MemberManagement() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-bengali">সদস্য তথ্য সম্পাদনা</DialogTitle>
-            <DialogDescription className="font-bengali">সদস্যের তথ্য পরিবর্তন করুন</DialogDescription>
+            <DialogTitle className="font-bengali flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" /> সদস্য তথ্য সম্পাদনা
+            </DialogTitle>
+            <DialogDescription className="font-bengali">সদস্যের তথ্য ও ঐচ্ছিক পাসওয়ার্ড পরিবর্তন করুন</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -373,6 +415,29 @@ export default function MemberManagement() {
               <Label className="font-bengali">রোল নম্বর</Label>
               <Input value={editRoll} onChange={e => setEditRoll(e.target.value)} placeholder="ঐচ্ছিক" />
             </div>
+            <div className="pt-2 border-t border-border/40">
+              <Label className="font-bengali flex items-center justify-between text-xs text-muted-foreground">
+                <span>নতুন পাসওয়ার্ড দিন (ঐচ্ছিক)</span>
+                <span className="text-[10px]">অপরিবর্তিত রাখতে খালি রাখুন</span>
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  type={showEditPassword ? 'text' : 'password'}
+                  value={editPassword}
+                  onChange={e => setEditPassword(e.target.value)}
+                  placeholder="পরিবর্তন করতে চাইলে নতুন পাসওয়ার্ড লিখুন"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title={showEditPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                >
+                  {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} className="font-bengali">বাতিল</Button>
@@ -385,31 +450,139 @@ export default function MemberManagement() {
 
       {/* Reset Password Dialog */}
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-bengali flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-primary" /> পাসওয়ার্ড রিসেট করুন
+              <KeyRound className="h-5 w-5 text-primary" /> পাসওয়ার্ড রিসেট ও পরিবর্তন
             </DialogTitle>
             <DialogDescription className="font-bengali">
-              {resetMember?.full_name}-এর জন্য নতুন পাসওয়ার্ড সেট করুন
+              {resetMember?.full_name}-এর অ্যাকাউন্টের জন্য পাসওয়ার্ড সেট করুন
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="font-bengali">নতুন পাসওয়ার্ড *</Label>
-              <Input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="ন্যূনতম ৬ অক্ষর" />
+
+          {resetSuccessData ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-3 animate-fade-in text-center my-2">
+              <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold font-bengali">
+                <Check className="h-5 w-5" /> পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে!
+              </div>
+              <p className="text-xs text-muted-foreground font-bengali">
+                <strong>{resetSuccessData.memberName}</strong>-এর জন্য নতুন পাসওয়ার্ড:
+              </p>
+              <div className="font-mono text-xl font-bold bg-background/90 text-primary border border-primary/30 py-1.5 px-4 rounded-lg inline-block tracking-wider shadow-inner">
+                {resetSuccessData.password}
+              </div>
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  className="w-full font-bengali gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md"
+                  onClick={() => {
+                    const msg = `প্রিয় ${resetSuccessData.memberName},\nআপনার SMC Meal Mate অ্যাকাউন্টের পাসওয়ার্ড রিসেট করা হয়েছে।\n🔑 নতুন পাসওয়ার্ড: ${resetSuccessData.password}\n🌐 লগইন লিঙ্ক: ${window.location.origin}/auth`;
+                    navigator.clipboard.writeText(msg);
+                    toast.success('হোয়াটসঅ্যাপ / মেসেজ টেক্সট কপি করা হয়েছে!');
+                  }}
+                >
+                  <Copy className="h-4 w-4" /> হোয়াটসঅ্যাপ / মেসেজ কপি করুন
+                </Button>
+              </div>
             </div>
-            <div>
-              <Label className="font-bengali">পাসওয়ার্ড নিশ্চিত করুন *</Label>
-              <Input type="password" value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)} placeholder="আবার লিখুন" />
+          ) : (
+            <div className="space-y-4 my-1">
+              {/* Member Quick Info */}
+              <div className="bg-muted/40 p-3 rounded-xl border border-border/50 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  <span className="font-semibold">{resetMember?.full_name}</span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Badge variant="outline" className="text-[10px]">{resetMember?.year} Year</Badge>
+                  <span>রোল: {resetMember?.roll_number || '—'}</span>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="space-y-1.5">
+                <Label className="font-bengali text-xs text-muted-foreground">⚡ দ্রুত পাসওয়ার্ড বসান:</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs flex-1 h-8 bg-background/60"
+                    onClick={() => handleQuickPassword('123456')}
+                  >
+                    123456
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="font-bengali text-xs flex-1 h-8 gap-1 bg-background/60"
+                    onClick={() => handleQuickPassword('random')}
+                  >
+                    <Sparkles className="h-3 w-3 text-amber-500" /> র্যান্ডম পিন
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label className="font-bengali text-sm">নতুন পাসওয়ার্ড *</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      type={showResetPassword ? 'text' : 'password'}
+                      value={resetPassword}
+                      onChange={e => setResetPassword(e.target.value)}
+                      placeholder="ন্যূনতম ৬ অক্ষর"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      title={showResetPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                    >
+                      {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-bengali text-sm">পাসওয়ার্ড নিশ্চিত করুন *</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      type={showResetConfirmPassword ? 'text' : 'password'}
+                      value={resetConfirmPassword}
+                      onChange={e => setResetConfirmPassword(e.target.value)}
+                      placeholder="আবার লিখুন"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirmPassword(!showResetConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      title={showResetConfirmPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                    >
+                      {showResetConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResetOpen(false)} className="font-bengali">বাতিল</Button>
-            <Button onClick={handleResetPassword} disabled={resetLoading} className="font-bengali gap-1">
-              <KeyRound className="h-4 w-4" />
-              {resetLoading ? 'পরিবর্তন হচ্ছে...' : 'পাসওয়ার্ড সেট করুন'}
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setResetOpen(false)} className="font-bengali">
+              {resetSuccessData ? 'বন্ধ করুন' : 'বাতিল'}
             </Button>
+            {!resetSuccessData && (
+              <Button
+                onClick={handleResetPassword}
+                disabled={resetLoading || resetPassword.length < 6}
+                className="font-bengali gap-1.5 bg-gradient-to-r from-primary to-info"
+              >
+                <KeyRound className="h-4 w-4" />
+                {resetLoading ? 'পরিবর্তন হচ্ছে...' : 'পাসওয়ার্ড সেট করুন'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

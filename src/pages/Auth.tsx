@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UtensilsCrossed, ShieldCheck, Download, LogIn, UserPlus, Lock, Mail, User, GraduationCap, ArrowLeft, Sparkles, Zap, Star, KeyRound, Sun, Moon, Check } from 'lucide-react';
+import { UtensilsCrossed, ShieldCheck, Download, LogIn, UserPlus, Lock, Mail, User, GraduationCap, ArrowLeft, Sparkles, Zap, Star, KeyRound, Sun, Moon, Check, Eye, EyeOff, Copy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { generateMealExcel } from '@/lib/excelGenerator';
 import { playClickSound, playSuccessSound } from '@/lib/sounds';
@@ -118,8 +118,13 @@ export default function Auth() {
   const [showForgot, setShowForgot] = useState(false);
   const [forgotStep, setForgotStep] = useState<'email' | 'otp' | 'newpass'>('email');
   const [otpCode, setOtpCode] = useState('');
+  const [receivedOtpCode, setReceivedOtpCode] = useState('');
+  const [emailSentStatus, setEmailSentStatus] = useState<boolean | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signupEnabled, setSignupEnabled] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
@@ -146,7 +151,7 @@ export default function Auth() {
     disableAdminMode();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
-        if (error) { toast.error(error.message); setLoading(false); return; }
+    if (error) { toast.error(error.message); setLoading(false); return; }
     toast.success('লগইন সফল!');
     playSuccessSound();
     setLoading(false);
@@ -159,7 +164,7 @@ export default function Auth() {
       email: signupEmail, password: signupPassword,
       options: { data: { full_name: fullName, roll_number: rollNumber || null, year, gender }, emailRedirectTo: `${window.location.origin}/` },
     });
-        if (error) { toast.error(error.message); }
+    if (error) { toast.error(error.message); }
     else { 
       toast.success('অ্যাকাউন্ট তৈরি হয়েছে! ইমেইলে ভেরিফিকেশন লিংক পাঠানো হয়েছে।', { duration: 10000 });
       playSuccessSound();
@@ -172,6 +177,8 @@ export default function Auth() {
     setShowForgot(false);
     setForgotStep('email');
     setOtpCode('');
+    setReceivedOtpCode('');
+    setEmailSentStatus(null);
     setNewPassword('');
     setConfirmNewPassword('');
     setForgotEmail('');
@@ -180,20 +187,33 @@ export default function Auth() {
 
   const handleForgotSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail.trim()) { toast.error('ইমেইল দিন'); return; }
+    const query = forgotEmail.trim();
+    if (!query) { toast.error('ইমেইল অথবা রোল নম্বর দিন'); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('password-reset-otp', {
-        body: { action: 'generate', email: forgotEmail.trim() },
+        body: { action: 'generate', identifier: query, email: query },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      if (data?.email) {
+        setForgotEmail(data.email);
+      }
       if (data?.code) {
+        setReceivedOtpCode(data.code);
         setOtpCode(data.code);
-        toast.success(`আপনার রিকভারি কোড: ${data.code}`, { duration: 30000 });
+      }
+      setEmailSentStatus(!!data?.email_sent);
+
+      if (data?.email_sent) {
+        toast.success(data.message || 'আপনার ইমেইলে ওটিপি কোড পাঠানো হয়েছে।', { duration: 10000 });
+      } else if (data?.code) {
+        toast.success(`আপনার ওটিপি কোড: ${data.code}`, { duration: 25000 });
       } else if (data?.message) {
         toast.success(data.message);
       }
+
       playSuccessSound();
       setForgotStep('otp');
       setResendTimer(60);
@@ -207,17 +227,24 @@ export default function Auth() {
     if (resendTimer > 0) return;
     setLoading(true);
     try {
+      const query = forgotEmail.trim();
       const { data, error } = await supabase.functions.invoke('password-reset-otp', {
-        body: { action: 'generate', email: forgotEmail.trim() },
+        body: { action: 'generate', identifier: query, email: query },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      if (data?.email) {
+        setForgotEmail(data.email);
+      }
       if (data?.code) {
+        setReceivedOtpCode(data.code);
         setOtpCode(data.code);
-        toast.success(`নতুন কোড: ${data.code}`, { duration: 30000 });
+        toast.success(`নতুন কোড: ${data.code}`, { duration: 25000 });
       } else if (data?.message) {
         toast.success(data.message);
       }
+      setEmailSentStatus(!!data?.email_sent);
       setResendTimer(60);
     } catch (err: any) {
       toast.error(err.message || 'কোড পাঠাতে সমস্যা হয়েছে');
@@ -243,6 +270,8 @@ export default function Auth() {
       if (data?.error) throw new Error(data.error);
       toast.success('পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে! এখন নতুন পাসওয়ার্ড দিয়ে লগইন করুন।', { duration: 8000 });
       playSuccessSound();
+      setLoginEmail(forgotEmail);
+      setLoginPassword(newPassword);
       resetForgotState();
     } catch (err: any) {
       toast.error(err.message || 'পাসওয়ার্ড পরিবর্তন করতে সমস্যা হয়েছে');
@@ -462,17 +491,25 @@ export default function Auth() {
                             <div className="text-center pb-2">
                               <Lock className="h-10 w-10 text-primary mx-auto mb-2 animate-bounce-in" />
                               <h3 className="font-bengali font-semibold text-lg">পাসওয়ার্ড ভুলে গেছেন?</h3>
-                              <p className="text-sm text-muted-foreground font-bengali mt-1">আপনার ইমেইলে ৬ সংখ্যার কোড পাঠানো হবে।</p>
+                              <p className="text-sm text-muted-foreground font-bengali mt-1">আপনার ইমেইল অথবা রোল নম্বর দিন। ওটিপি কোড তৈরি করে পাসওয়ার্ড রিসেট করা হবে।</p>
                             </div>
                             <div className="space-y-2">
-                              <Label className="font-bengali text-sm">ইমেইল</Label>
+                              <Label className="font-bengali text-sm">ইমেইল অথবা রোল নম্বর</Label>
                               <div className="relative group">
                                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required className={inputCls} placeholder="your@email.com" autoFocus />
+                                <Input
+                                  type="text"
+                                  value={forgotEmail}
+                                  onChange={e => setForgotEmail(e.target.value)}
+                                  required
+                                  className={inputCls}
+                                  placeholder="your@email.com অথবা রোল নম্বর (যেমন: 12)"
+                                  autoFocus
+                                />
                               </div>
                             </div>
                             <Button type="submit" className="w-full font-bengali h-11 rounded-xl bg-gradient-to-r from-primary to-info hover:shadow-lg hover:shadow-primary/30 transition-all duration-300 hover:scale-[1.02]" disabled={loading}>
-                              {loading ? <LoadingSpinner /> : '📧 কোড পাঠান'}
+                              {loading ? <LoadingSpinner /> : '📧 ওটিপি কোড পাঠান'}
                             </Button>
                             <Button type="button" variant="ghost" className="w-full font-bengali text-sm gap-1" onClick={resetForgotState}>
                               <ArrowLeft className="h-3.5 w-3.5" /> লগইনে ফিরে যান
@@ -485,9 +522,46 @@ export default function Auth() {
                               <Mail className="h-10 w-10 text-primary mx-auto mb-2 animate-bounce-in" />
                               <h3 className="font-bengali font-semibold text-lg">কোড যাচাই করুন</h3>
                               <p className="text-sm text-muted-foreground font-bengali mt-1">
-                                আপনার ৬ সংখ্যার কোড নিচে দিন
+                                আপনার ৬ সংখ্যার ভেরিফিকেশন কোড নিচে দিন
                               </p>
                             </div>
+
+                            {receivedOtpCode && (
+                              <div className="bg-primary/10 border border-primary/30 rounded-xl p-3 text-center space-y-2 animate-fade-in shadow-sm">
+                                <p className="text-xs text-muted-foreground font-bengali">
+                                  {emailSentStatus ? '📧 আপনার ইমেইলে পাঠানো ওটিপি কোড:' : '🔑 আপনার ওটিপি রিকভারি কোড:'}
+                                </p>
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="font-mono text-2xl font-bold tracking-widest text-primary bg-background/80 px-3.5 py-1 rounded-lg border border-primary/30 shadow-inner">
+                                    {receivedOtpCode}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="font-bengali text-xs h-9 gap-1 hover:bg-primary/10 transition-colors"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(receivedOtpCode);
+                                      toast.success('কোড কপি করা হয়েছে!');
+                                    }}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" /> কপি
+                                  </Button>
+                                </div>
+                                {otpCode !== receivedOtpCode && (
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="font-bengali text-xs h-7 w-full gap-1 shadow-xs"
+                                    onClick={() => setOtpCode(receivedOtpCode)}
+                                  >
+                                    ⚡ কোড অটো-ফিল করুন
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+
                             <div className="space-y-2">
                               <Label className="font-bengali text-sm">৬ সংখ্যার কোড</Label>
                               <Input
@@ -501,10 +575,10 @@ export default function Auth() {
                               />
                             </div>
                             <Button type="submit" className="w-full font-bengali h-11 rounded-xl bg-gradient-to-r from-primary to-info hover:shadow-lg hover:shadow-primary/30 transition-all duration-300 hover:scale-[1.02]" disabled={otpCode.length !== 6}>
-                              ✅ পরবর্তী ধাপ
+                              ✅ পরবর্তী ধাপ (পাসওয়ার্ড সেট করুন)
                             </Button>
                             <div className="flex items-center justify-between">
-                              <Button type="button" variant="ghost" size="sm" className="font-bengali text-xs gap-1" onClick={() => { setForgotStep('email'); setOtpCode(''); }}>
+                              <Button type="button" variant="ghost" size="sm" className="font-bengali text-xs gap-1" onClick={() => { setForgotStep('email'); setOtpCode(''); setReceivedOtpCode(''); }}>
                                 <ArrowLeft className="h-3 w-3" /> ইমেইল পরিবর্তন
                               </Button>
                               <Button
@@ -529,7 +603,24 @@ export default function Auth() {
                               <Label className="font-bengali text-sm">নতুন পাসওয়ার্ড</Label>
                               <div className="relative group">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6} className={inputCls} autoFocus />
+                                <Input
+                                  type={showNewPassword ? 'text' : 'password'}
+                                  value={newPassword}
+                                  onChange={e => setNewPassword(e.target.value)}
+                                  required
+                                  minLength={6}
+                                  className={`${inputCls} pr-10`}
+                                  placeholder="কমপক্ষে ৬ অক্ষর"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowNewPassword(!showNewPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                  title={showNewPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                                >
+                                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
                               </div>
                               {newPassword && (
                                 <div className="flex gap-1 mt-1">
@@ -543,7 +634,23 @@ export default function Auth() {
                               <Label className="font-bengali text-sm">পাসওয়ার্ড নিশ্চিত করুন</Label>
                               <div className="relative group">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                <Input type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} required minLength={6} className={inputCls} />
+                                <Input
+                                  type={showConfirmPassword ? 'text' : 'password'}
+                                  value={confirmNewPassword}
+                                  onChange={e => setConfirmNewPassword(e.target.value)}
+                                  required
+                                  minLength={6}
+                                  className={`${inputCls} pr-10`}
+                                  placeholder="আবার লিখুন"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                  title={showConfirmPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                                >
+                                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
                               </div>
                               {confirmNewPassword && newPassword !== confirmNewPassword && (
                                 <p className="text-xs text-destructive font-bengali">⚠️ পাসওয়ার্ড মিলছে না</p>
@@ -568,7 +675,21 @@ export default function Auth() {
                           <Label className="font-bengali text-sm">পাসওয়ার্ড</Label>
                           <div className="relative group">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                            <Input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required className={inputCls} />
+                            <Input
+                              type={showLoginPassword ? 'text' : 'password'}
+                              value={loginPassword}
+                              onChange={e => setLoginPassword(e.target.value)}
+                              required
+                              className={`${inputCls} pr-10`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowLoginPassword(!showLoginPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                              title={showLoginPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                            >
+                              {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
                           </div>
                         </div>
                         <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-primary via-primary to-info text-primary-foreground hover:shadow-xl hover:shadow-primary/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold" disabled={loading}>
