@@ -126,6 +126,63 @@ export default function StudentDashboard() {
     const { data } = await supabase
       .from('daily_meals').select('*')
       .eq('user_id', user.id).eq('meal_date', mealDate).maybeSingle();
+
+    if (!data) {
+      try {
+        const { data: offData } = await supabase
+          .from('meal_off_periods' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .lte('start_date', mealDate)
+          .gte('end_date', mealDate)
+          .maybeSingle();
+
+        const isOff = !!offData;
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const { data: todayRow } = await supabase
+          .from('daily_meals')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('meal_date', todayStr)
+          .maybeSingle();
+
+        let defaultLunch = true;
+        let defaultDinner = true;
+        if (isOff) {
+          defaultLunch = false;
+          defaultDinner = false;
+        } else if (todayRow) {
+          defaultLunch = todayRow.lunch_off_today_only ? true : todayRow.lunch;
+          defaultDinner = todayRow.dinner_off_today_only ? true : todayRow.dinner;
+        }
+
+        const defaultMeal = {
+          user_id: user.id,
+          meal_date: mealDate,
+          lunch: defaultLunch,
+          dinner: defaultDinner,
+          lunch_extra_option: todayRow?.lunch_extra_option || null,
+          dinner_extra_option: todayRow?.dinner_extra_option || null,
+          lunch_off_today_only: false,
+          dinner_off_today_only: false,
+        };
+
+        const { data: inserted } = await supabase
+          .from('daily_meals')
+          .insert(defaultMeal)
+          .select()
+          .maybeSingle();
+
+        setTodayMeal(inserted || defaultMeal);
+      } catch (e) {
+        console.error('Error auto-initializing meal:', e);
+        setTodayMeal(null);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     setTodayMeal(data);
     setLoading(false);
   };

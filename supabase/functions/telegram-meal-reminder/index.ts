@@ -127,6 +127,61 @@ Deno.serve(async (req) => {
     const todayMap = new Map<string, any>();
     (todayMeals || []).forEach((m: any) => todayMap.set(m.user_id, m));
 
+    // Self-healing: If any active profiles are missing tomorrow's meal record in daily_meals
+    const missingProfiles = profiles.filter((p: any) => !tomorrowMap.has(p.user_id));
+    if (missingProfiles.length > 0) {
+      const { data: offPeriods } = await supabase
+        .from('meal_off_periods')
+        .select('user_id, start_date, end_date')
+        .lte('start_date', tomorrowStr)
+        .gte('end_date', todayStr);
+
+      const offList = offPeriods || [];
+      const rowsToInsert: any[] = [];
+
+      for (const p of missingProfiles) {
+        const todayMeal = todayMap.get(p.user_id);
+        const isTargetOff = offList.some(
+          (op: any) => op.user_id === p.user_id && tomorrowStr >= op.start_date && tomorrowStr <= op.end_date
+        );
+        const isSourceOff = offList.some(
+          (op: any) => op.user_id === p.user_id && todayStr >= op.start_date && todayStr <= op.end_date
+        );
+
+        let carriedLunch = true;
+        let carriedDinner = true;
+
+        if (isTargetOff) {
+          carriedLunch = false;
+          carriedDinner = false;
+        } else if (isSourceOff) {
+          carriedLunch = true;
+          carriedDinner = true;
+        } else if (todayMeal) {
+          carriedLunch = todayMeal.lunch_off_today_only ? true : todayMeal.lunch;
+          carriedDinner = todayMeal.dinner_off_today_only ? true : todayMeal.dinner;
+        }
+
+        const newRow = {
+          user_id: p.user_id,
+          meal_date: tomorrowStr,
+          lunch: carriedLunch,
+          dinner: carriedDinner,
+          lunch_extra_option: todayMeal?.lunch_extra_option || null,
+          dinner_extra_option: todayMeal?.dinner_extra_option || null,
+          lunch_off_today_only: false,
+          dinner_off_today_only: false,
+        };
+
+        rowsToInsert.push(newRow);
+        tomorrowMap.set(p.user_id, newRow);
+      }
+
+      if (rowsToInsert.length > 0) {
+        await supabase.from('daily_meals').insert(rowsToInsert);
+      }
+    }
+
     const extraMap = new Map<string, { extraLunch: number; extraDinner: number }>();
     const extraOptionMap = new Map<string, string[]>();
     (extraMealsData || []).forEach((em: any) => {

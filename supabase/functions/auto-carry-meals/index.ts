@@ -108,8 +108,8 @@ Deno.serve(async (req) => {
       (p: any) => p.user_id === u.user_id && sourceDate >= p.start_date && sourceDate <= p.end_date
     );
 
-    let carriedLunch = false;
-    let carriedDinner = false;
+    let carriedLunch = true;
+    let carriedDinner = true;
 
     if (isTargetOff) {
       carriedLunch = false;
@@ -118,10 +118,13 @@ Deno.serve(async (req) => {
       // The off period has just ended, restore default state to ON
       carriedLunch = true;
       carriedDinner = true;
-    } else {
-      if (!sourceMeal) { skippedCount++; continue; }
+    } else if (sourceMeal) {
       carriedLunch = sourceMeal.lunch_off_today_only ? true : sourceMeal.lunch;
       carriedDinner = sourceMeal.dinner_off_today_only ? true : sourceMeal.dinner;
+    } else {
+      // If no source meal record exists, default to active ON
+      carriedLunch = true;
+      carriedDinner = true;
     }
 
     const carriedData = {
@@ -162,10 +165,6 @@ Deno.serve(async (req) => {
   }
 
   // Auto-delete expired special day items (past dates)
-  await supabase.from("special_day_responses")
-    .delete()
-    .lt("item_id", today) // will be handled by cascade or separate query
-  // Delete special_day_items where item_date < today
   const { data: expiredItems } = await supabase
     .from("special_day_items")
     .select("id")

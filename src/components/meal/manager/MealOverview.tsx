@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { format, addDays, getDay } from 'date-fns';
-import { Utensils, Sun, Moon, Users, Calendar, Search, Plus, Minus, Edit2 } from 'lucide-react';
+import { Utensils, Sun, Moon, Users, Calendar, Search, Plus, Minus, Edit2, RefreshCw } from 'lucide-react';
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
 import { sortByRoll } from '@/lib/sortMembers';
 
@@ -62,6 +62,7 @@ export default function MealOverview() {
   const [dateExtras, setDateExtras] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const fetchStats = async () => {
     const now = new Date();
@@ -93,6 +94,28 @@ export default function MealOverview() {
     setDateMeals(meals || []);
     setProfiles(profs || []);
     setDateExtras(extras || []);
+  };
+
+  const handleSyncMeals = async () => {
+    setSyncing(true);
+    try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const { data, error } = await supabase.functions.invoke('auto-carry-meals', {
+        body: {
+          source_date: todayStr,
+          target_date: selectedDate,
+          triggered_by: 'manual',
+        }
+      });
+      if (error) throw error;
+      toast.success(data?.message || 'মিল সিঙ্ক সম্পন্ন হয়েছে');
+      fetchStats();
+      fetchDateMeals();
+    } catch (err: any) {
+      toast.error('সিঙ্ক ব্যর্থ: ' + err.message);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => { fetchStats(); fetchDateMeals(); }, [selectedDate]);
@@ -185,27 +208,31 @@ export default function MealOverview() {
   const filteredProfiles = sortByRoll(profiles.filter(p => !searchQuery || p.full_name.toLowerCase().includes(searchQuery.toLowerCase())));
   const canEdit = isManager || isAdmin;
 
-  const managerToggleExtra = async (userId: string, mealType: 'lunch' | 'dinner', value: string, checked: boolean) => {
+  const managerToggleExtra = async (userId: string, mealType: 'lunch' | 'dinner', optionValue: string, checked: boolean) => {
+    if (!isManager && !isAdmin) return;
     const existing = dateMeals.find(m => m.user_id === userId);
-    const existingOption = mealType === 'lunch' ? existing?.lunch_extra_option : existing?.dinner_extra_option;
-    let current: string[] = existingOption ? Array.from(new Set(existingOption.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
-
-    if (checked) {
-      const option = ALL_EXTRA_OPTIONS.find(o => o.value === value);
-      const group = (option as any)?.group;
-      if (group && EGG_GROUPS[group]) {
-        current = current.filter((v: string) => !EGG_GROUPS[group].includes(v));
-      }
-      current.push(value);
+    let currentExtras: string[] = [];
+    if (mealType === 'lunch') {
+      currentExtras = existing?.lunch_extra_option ? Array.from(new Set(existing.lunch_extra_option.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
     } else {
-      current = current.filter((v: string) => v !== value);
+      currentExtras = existing?.dinner_extra_option ? Array.from(new Set(existing.dinner_extra_option.split(',').map((s: string) => s.trim()).filter(Boolean))) : [];
     }
 
-    const stored = current.length > 0 ? current.join(',') : null;
-    const updatePayload = mealType === 'lunch' ? { lunch_extra_option: stored } : { dinner_extra_option: stored };
+    if (checked) {
+      const eggGroup = Object.entries(EGG_GROUPS).find(([_, values]) => values.includes(optionValue));
+      if (eggGroup) {
+        currentExtras = currentExtras.filter(v => !eggGroup[1].includes(v));
+      }
+      currentExtras.push(optionValue);
+    } else {
+      currentExtras = currentExtras.filter(v => v !== optionValue);
+    }
+
+    const newOptionStr = currentExtras.length > 0 ? currentExtras.join(',') : null;
+    const updatePayload = mealType === 'lunch' ? { lunch_extra_option: newOptionStr } : { dinner_extra_option: newOptionStr };
     const insertPayload = mealType === 'lunch'
-      ? { user_id: userId, meal_date: selectedDate, lunch_extra_option: stored }
-      : { user_id: userId, meal_date: selectedDate, dinner_extra_option: stored };
+      ? { user_id: userId, meal_date: selectedDate, lunch_extra_option: newOptionStr }
+      : { user_id: userId, meal_date: selectedDate, dinner_extra_option: newOptionStr };
 
     if (existing) {
       await supabase.from('daily_meals').update(updatePayload).eq('id', existing.id);
@@ -226,6 +253,18 @@ export default function MealOverview() {
         <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="w-auto" />
         <Badge variant="outline" className="font-bengali">{format(new Date(selectedDate), 'dd MMMM yyyy')}</Badge>
         {isFeastDay(selectedDate) && <Badge variant="destructive" className="font-bengali">Feast Day</Badge>}
+        {canEdit && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSyncMeals}
+            disabled={syncing}
+            className="font-bengali text-xs gap-1.5 ml-auto"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'সিঙ্ক হচ্ছে...' : 'মিল সিঙ্ক করুন'}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-children">

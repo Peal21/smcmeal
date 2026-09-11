@@ -1157,3 +1157,26 @@ FOR DELETE TO authenticated
 USING (public.has_role(auth.uid(), 'meal_manager') OR public.has_role(auth.uid(), 'super_admin'));
 
 
+-- ===== Migration: 20260911223000_ensure_auto_carry_cron.sql =====
+-- Auto-carry meals schedule
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'auto-carry-meals-nightly') THEN
+    PERFORM cron.unschedule('auto-carry-meals-nightly');
+  END IF;
+END $$;
+
+SELECT cron.schedule(
+  'auto-carry-meals-nightly',
+  '0 18 * * *',
+  $cron$
+  SELECT net.http_post(
+    url := 'https://hcbsbgjlkqugwlkilinq.supabase.co/functions/v1/auto-carry-meals',
+    headers := '{"Content-Type": "application/json"}'::jsonb,
+    body := '{"triggered_by": "cron"}'::jsonb
+  );
+  $cron$
+);
+
+
+
