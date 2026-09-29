@@ -836,13 +836,114 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, response: res }), { headers: corsHeaders });
     }
 
-    // 4. Handle Incoming Telegram Webhook Update
+    // 4. Website Meal Change → Telegram DM + Group mention
+    if (body?.action === "notify_website_meal_change") {
+      const { user_id, message: notifMessage, roll, name } = body;
+      if (!user_id && !roll) {
+        return new Response(JSON.stringify({ error: "user_id or roll required" }), { status: 400, headers: corsHeaders });
+      }
+
+      // Fetch profile's telegram_chat_id
+      let telegramChatId: string | null = null;
+      let telegramUsername: string | null = null;
+      let fullName = name || "";
+      let rollNumber = roll || "";
+      if (user_id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("telegram_chat_id, telegram_username, full_name, roll_number")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        if (prof) {
+          telegramChatId = prof.telegram_chat_id;
+          telegramUsername = prof.telegram_username;
+          fullName = prof.full_name || fullName;
+          rollNumber = prof.roll_number || rollNumber;
+        }
+      }
+
+      // Fetch group chat ID from app_settings
+      const { data: settingsRow } = await supabase
+        .from("app_settings")
+        .select("telegram_chat_id, telegram_enabled")
+        .eq("id", 1)
+        .single();
+
+      const groupChatId = settingsRow?.telegram_chat_id;
+      const botEnabled = settingsRow?.telegram_enabled !== false;
+
+      if (!botEnabled) {
+        return new Response(JSON.stringify({ ok: true, skipped: true, reason: "Bot disabled" }), { headers: corsHeaders });
+      }
+
+      const msgText = notifMessage || `📢 ওয়েবসাইট থেকে মিল আপডেট হয়েছে।\n👤 <b>${fullName}</b> (রোল: ${rollNumber})`;
+
+      const results: any = {};
+
+      // Send DM to student if they have linked Telegram
+      if (telegramChatId) {
+        try {
+          results.dm = await sendTelegramReply(telegramChatId, `📲 <b>আপনার মিল আপডেট হয়েছে!</b>\n\n${msgText}`);
+        } catch (e) {
+          console.warn("DM failed:", e);
+          results.dm_error = String(e);
+        }
+      } else {
+        results.dm = "no_telegram_linked";
+      }
+
+      // Post mention in group chat
+      if (groupChatId) {
+        const mention = telegramUsername ? `@${telegramUsername}` : `<b>${fullName}</b>`;
+        const groupMsg = `🔔 ${mention} — ${msgText}`;
+        try {
+          results.group = await sendTelegramReply(groupChatId, groupMsg, undefined, true);
+        } catch (e) {
+          console.warn("Group notify failed:", e);
+          results.group_error = String(e);
+        }
+      }
+
+      return new Response(JSON.stringify({ ok: true, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 5. Link Telegram account to profile (called from website settings)
+    if (body?.action === "link_telegram_account") {
+      const { roll, telegram_chat_id: tgChatId, telegram_username: tgUsername } = body;
+      if (!roll || !tgChatId) {
+        return new Response(JSON.stringify({ error: "roll and telegram_chat_id required" }), { status: 400, headers: corsHeaders });
+      }
+      const { data: prof, error: profErr } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .eq("roll_number", String(roll))
+        .eq("is_active", true)
+        .maybeSingle();
+      if (profErr || !prof) {
+        return new Response(JSON.stringify({ ok: false, error: "Profile not found for roll " + roll }), { status: 404, headers: corsHeaders });
+      }
+      await supabase.from("profiles").update({
+        telegram_chat_id: String(tgChatId),
+        telegram_username: tgUsername || null,
+      }).eq("user_id", prof.user_id);
+
+      await sendTelegramReply(String(tgChatId), `✅ আপনার Telegram অ্যাকাউন্ট Satkhira Meal Mate-এ লিঙ্ক হয়েছে!\n👤 <b>${prof.full_name}</b> (রোল: ${roll})\n\nএখন থেকে ওয়েবসাইট থেকে মিল আপডেট হলে আপনি সরাসরি এখানে নোটিফিকেশন পাবেন। 🎉`);
+
+      return new Response(JSON.stringify({ ok: true, user_id: prof.user_id, name: prof.full_name }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 6. Handle Incoming Telegram Webhook Update
     const message = body?.message || body?.edited_message;
     if (!message || !message.text) {
       return new Response(JSON.stringify({ ok: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const chatId = message.chat.id;
     const messageId = message.message_id;
@@ -890,8 +991,43 @@ Deno.serve(async (req) => {
     // Format cutoff string for display
     const cutoffDisplay = `${cutoffHour > 12 ? cutoffHour - 12 : cutoffHour}:${String(cutoffMinute).padStart(2, "0")} ${cutoffHour >= 12 ? "PM" : "AM"}`;
 
+    // A0. Handle /start [roll] in private DM — link Telegram account
+    if (!isGroup && text.match(/^\/start(\s+\d+)?/i)) {
+      const rollMatch = text.match(/^\/start\s+(\d+)/i);
+      const tgUserId = String(message.from?.id || chatId);
+      const tgUsername = message.from?.username || null;
+      const tgFirstName = message.from?.first_name || "";
+
+      if (rollMatch) {
+        const rollNum = rollMatch[1];
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, roll_number")
+          .eq("roll_number", rollNum)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!prof) {
+          await sendTelegramReply(chatId, `❌ রোল নম্বর <b>${rollNum}</b> দিয়ে কোনো সক্রিয় সদস্য পাওয়া যায়নি!\nসঠিক রোল নম্বর দিয়ে চেষ্টা করুন: <code>/start আপনার_রোল</code>`, messageId);
+        } else {
+          await supabase.from("profiles").update({
+            telegram_chat_id: tgUserId,
+            telegram_username: tgUsername,
+          }).eq("user_id", prof.user_id);
+
+          await sendTelegramReply(chatId, `✅ <b>সংযোগ সফল!</b>\n\n👤 <b>${prof.full_name}</b> (রোল: ${prof.roll_number})\n\nআপনার Telegram এখন Satkhira Meal Mate-এ লিঙ্ক হয়েছে। ওয়েবসাইট থেকে মিল পরিবর্তন হলে আপনি সরাসরি এখানে নোটিফিকেশন পাবেন! 🎉\n\n<i>আপনি এখন গ্রুপ বা এখানে মিল কমান্ড দিতে পারবেন।</i>`);
+        }
+        return new Response(JSON.stringify({ ok: true, type: "start_link" }), { headers: corsHeaders });
+      } else {
+        // /start without roll — show welcome
+        await sendTelegramReply(chatId, `👋 <b>স্বাগতম, ${tgFirstName}!</b>\n\nSatkhira Meal Mate Bot-এ আপনাকে স্বাগতম!\n\n📲 <b>Telegram লিঙ্ক করতে:</b>\n<code>/start আপনার_রোল_নম্বর</code>\nউদাহরণ: <code>/start 25</code>\n\n🍽️ লিঙ্ক করলে ওয়েবসাইট থেকে মিল আপডেট হলে এখানে নোটিফিকেশন পাবেন!\n\n📊 সাহায্যের জন্য: /help`);
+        return new Response(JSON.stringify({ ok: true, type: "start_welcome" }), { headers: corsHeaders });
+      }
+    }
+
     // A. Handle /help or help command
     if (parsed.isHelp) {
+
       const helpText = `🤖 <b>Satkhira Meal Mate Bot Commands</b>
 ━━━━━━━━━━━━━━━━━━━━
 গ্রুপে মেসেজ দিয়ে সহজে মিল ও অতিরিক্ত মিল আপডেট করুন:

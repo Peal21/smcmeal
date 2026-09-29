@@ -1213,7 +1213,10 @@ CREATE TRIGGER trg_set_extra_meal_feast_defaults
 BEFORE INSERT OR UPDATE OF meal_date, meal_type, quantity
 ON public.extra_meals
 FOR EACH ROW
-EXECUTE FUNCTION public.set_extra_meal_feast_defaults();
-
-
-
+EXECUTE FUNCTION public.set_extra_meal_feast_defaults();-- ===== Migration: 20260929160000_add_telegram_and_whatsapp_settings.sql =====
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS telegram_chat_id text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS telegram_username text;
+ALTER TABLE public.app_settings ADD COLUMN IF NOT EXISTS whatsapp_enabled boolean DEFAULT false;
+ALTER TABLE public.app_settings ADD COLUMN IF NOT EXISTS whatsapp_webhook_url text;
+ALTER TABLE public.app_settings ADD COLUMN IF NOT EXISTS whatsapp_api_key text;
+ALTER TABLE public.app_settings ADD COLUMN IF NOT EXISTS whatsapp_group_id text;

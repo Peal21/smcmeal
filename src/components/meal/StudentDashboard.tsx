@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { notifyUpdate } from '@/lib/notify';
+import { notifyUpdate, sendTelegramMealNotification } from '@/lib/notify';
 import { format, addDays, isAfter, set, getDay } from 'date-fns';
 import { Sun, Moon, Utensils, Wallet, TrendingUp, Clock, Plus, Minus, Trash2, Edit2, Check, X, AlertTriangle, ShieldAlert, Phone, History, Timer } from 'lucide-react';
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
@@ -546,11 +546,24 @@ export default function StudentDashboard() {
       }
       await fetchTodayMeal();
       const label = type === 'lunch' ? 'লাঞ্চ' : 'ডিনার';
+      const dateDisplay = format(new Date(mealDate + 'T00:00:00'), 'dd MMM yyyy');
 
       void sendMealUpdateEmail({
         mealType: type,
         action: value ? 'ON' : 'OFF',
         mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy')
+      });
+
+      // Telegram notification (fire-and-forget)
+      void sendTelegramMealNotification({
+        userId: user.id,
+        roll: profile?.roll_number || '',
+        name: profile?.full_name || '',
+        message: value
+          ? `☀️ <b>${label} চালু</b> — ${dateDisplay}\n👤 <b>${profile?.full_name || ''}</b> (রোল: ${profile?.roll_number || ''})`
+          : offTodayOnly
+            ? `❌ <b>${label} বন্ধ (শুধু আগামীকাল)</b> — ${dateDisplay}\n👤 <b>${profile?.full_name || ''}</b> (রোল: ${profile?.roll_number || ''})`
+            : `❌ <b>${label} বন্ধ</b> — ${dateDisplay}\n👤 <b>${profile?.full_name || ''}</b> (রোল: ${profile?.roll_number || ''})`,
       });
 
       if (value) {
@@ -750,6 +763,8 @@ export default function StudentDashboard() {
     const isFeast = dayOfWeek === 1 || dayOfWeek === 5;
     const mealCountEquivalent = isFeast ? 3 : 1;
 
+    const dateDisplay = format(new Date(mealDate + 'T00:00:00'), 'dd MMM yyyy');
+    const extraLabel = extraMealType === 'lunch' ? 'লাঞ্চ' : 'ডিনার';
     if (editingExtraMealId) {
       const { error } = await supabase.from('extra_meals').update({
         meal_type: extraMealType,
@@ -768,6 +783,12 @@ export default function StudentDashboard() {
         extraOption: extraOptionStr,
         mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy'),
         mealCountEquivalent: mealCountEquivalent
+      });
+      void sendTelegramMealNotification({
+        userId: user.id,
+        roll: profile?.roll_number || '',
+        name: profile?.full_name || '',
+        message: `✏️ <b>Extra ${extraLabel} আপডেট</b> — ${dateDisplay}\n👤 <b>${profile?.full_name || ''}</b> (রোল: ${profile?.roll_number || ''})\n🍽️ পরিমাণ: ${qty}${isFeast ? ' (Feast Day — ১টি = ৩ মিল)' : ''}`,
       });
       notify('আপডেট হয়েছে');
     } else {
@@ -792,6 +813,12 @@ export default function StudentDashboard() {
         mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy'),
         mealCountEquivalent: mealCountEquivalent
       });
+      void sendTelegramMealNotification({
+        userId: user.id,
+        roll: profile?.roll_number || '',
+        name: profile?.full_name || '',
+        message: `➕ <b>Extra ${extraLabel} যোগ</b> — ${dateDisplay}\n👤 <b>${profile?.full_name || ''}</b> (রোল: ${profile?.roll_number || ''})\n🍽️ পরিমাণ: ${qty}${isFeast ? ' (Feast Day — ১টি = ৩ মিল)' : ''}`,
+      });
       notify(`${qty}টি অতিরিক্ত ${extraMealType === 'lunch' ? 'লাঞ্চ' : 'ডিনার'} যোগ হয়েছে${isFeast ? ' (Feast Day — ১টি = ৩ মিল)' : ''}`);
       setExtraQuantity('0');
       setExtraReason('');
@@ -799,6 +826,8 @@ export default function StudentDashboard() {
     setShowExtraItemDialog(false);
     setPendingExtraOption([]);
     setEditingExtraMealId(null);
+    fetchExtraMeals();
+    fetchMonthStats();
   };
 
   const deleteExtraMeal = async (id: string, mealDateStr: string) => {
@@ -814,8 +843,19 @@ export default function StudentDashboard() {
           mealType: em.meal_type as any,
           mealDate: format(new Date(mealDateStr + 'T00:00:00'), 'dd MMMM yyyy')
         });
+        const dLabel = em.meal_type === 'lunch' ? 'লাঞ্চ' : 'ডিনার';
+        if (user) {
+          void sendTelegramMealNotification({
+            userId: user.id,
+            roll: profile?.roll_number || '',
+            name: profile?.full_name || '',
+            message: `🗑️ <b>Extra ${dLabel} বাতিল</b> — ${format(new Date(mealDateStr + 'T00:00:00'), 'dd MMM yyyy')}\n👤 <b>${profile?.full_name || ''}</b> (রোল: ${profile?.roll_number || ''})`,
+          });
+        }
       }
       notify('অতিরিক্ত মিল মুছে ফেলা হয়েছে');
+      fetchExtraMeals();
+      fetchMonthStats();
     }
   };
 
