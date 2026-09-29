@@ -11,10 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Settings, Calculator, UserCheck, ShieldCheck, UserPlus, Send, ArrowRightCircle, CalendarDays, Save, History, Plus, Clock, X } from 'lucide-react';
+import { Settings, Calculator, UserCheck, ShieldCheck, UserPlus, Send, ArrowRightCircle, CalendarDays, Save, History, Plus, Clock, X, Bot, Copy, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { getMealMonthDateRange } from '@/lib/mealMonth';
 import { sortByRoll } from '@/lib/sortMembers';
+import { getExtraMealEquivalent } from '@/lib/feastDay';
 
 const MONTH_QUERY_LIMIT = 10000;
 
@@ -56,6 +57,10 @@ export default function MonthSettings() {
   const [telegramEnabled, setTelegramEnabled] = useState(true);
   const [telegramScheduleTimes, setTelegramScheduleTimes] = useState<string[]>([]);
   const [newScheduleTime, setNewScheduleTime] = useState('21:00');
+  const [webhookConnecting, setWebhookConnecting] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<any>(null);
+  const [testingBot, setTestingBot] = useState(false);
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [newMonthStart, setNewMonthStart] = useState('');
   const [newMonthEnd, setNewMonthEnd] = useState('');
@@ -128,17 +133,9 @@ export default function MonthSettings() {
     ]);
 
     const regularMeals = (mealsRes.data || []).reduce((a, m) => {
-      let count = (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
-      if (m.lunch && m.lunch_extra_option) {
-        const dayOfWeek = new Date(m.meal_date).getDay();
-        const isFeastDay = dayOfWeek === 1 || dayOfWeek === 5;
-        if (isFeastDay) {
-          count += m.lunch_extra_option.split(',').filter(Boolean).length * 3;
-        }
-      }
-      return a + count;
+      return a + (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
     }, 0);
-    const extraMeals = (extraRes.data || []).reduce((a, e) => a + e.quantity * e.meal_count_equivalent, 0);
+    const extraMeals = (extraRes.data || []).reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
     setTotalMeals(regularMeals + extraMeals);
   };
 
@@ -235,7 +232,7 @@ export default function MonthSettings() {
         userMealMap.set(m.user_id, (userMealMap.get(m.user_id) || 0) + count);
       });
       (extraRes.data || []).forEach(e => {
-        userMealMap.set(e.user_id, (userMealMap.get(e.user_id) || 0) + e.quantity * e.meal_count_equivalent);
+        userMealMap.set(e.user_id, (userMealMap.get(e.user_id) || 0) + (Number(e.quantity) || 0) * getExtraMealEquivalent(e));
       });
 
       // Per-user payments
@@ -374,6 +371,84 @@ export default function MonthSettings() {
     } else {
       toast.success(val ? 'Telegram বট চালু হয়েছে' : 'Telegram বট বন্ধ হয়েছে');
     }
+  };
+
+  const handleSetWebhook = async () => {
+    setWebhookConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('telegram-bot-webhook', {
+        body: { action: 'set_webhook' }
+      });
+      if (error) throw error;
+      if (data?.telegram_response?.ok) {
+        toast.success('Telegram Webhook সফলভাবে কানেক্ট করা হয়েছে! এখন গ্রুপ মেসেজ কাজ করবে।');
+        setWebhookStatus(data);
+      } else {
+        toast.error('Webhook সেট ব্যর্থ: ' + (data?.telegram_response?.description || JSON.stringify(data)));
+      }
+    } catch (err: any) {
+      console.error('Webhook set error:', err);
+      toast.error('সমস্যা হয়েছে: ' + (err.message || 'Unknown error'));
+    } finally {
+      setWebhookConnecting(false);
+    }
+  };
+
+  const handleCheckWebhook = async () => {
+    setWebhookConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('telegram-bot-webhook', {
+        body: { action: 'get_webhook_info' }
+      });
+      if (error) throw error;
+      const info = data?.webhook_info?.result;
+      setWebhookStatus(info);
+      if (info?.url) {
+        toast.success(`Webhook সক্রিয় আছে: ${info.url}`);
+      } else {
+        toast.info('এখনো কোনো Webhook সেট করা নেই। "Webhook কানেক্ট করুন" চাপুন।');
+      }
+    } catch (err: any) {
+      console.error('Check webhook error:', err);
+      toast.error('চেক ব্যর্থ: ' + (err.message || 'Unknown error'));
+    } finally {
+      setWebhookConnecting(false);
+    }
+  };
+
+  const handleSendTestMessage = async () => {
+    if (!telegramChatId) {
+      toast.error('প্রথমে Telegram Group Chat ID সেভ করুন');
+      return;
+    }
+    setTestingBot(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('telegram-bot-webhook', {
+        body: { 
+          action: 'send_test', 
+          chat_id: telegramChatId, 
+          text: '🤖 <b>Satkhira Meal Mate</b>: Telegram Bot সফলভাবে টেস্ট সম্পন্ন হয়েছে!\nএখন গ্রুপে <code>roll 25 L on D off extra goru</code> লিখে মেসেজ দিন।' 
+        }
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success('Telegram গ্রুপে টেস্ট মেসেজ পাঠানো হয়েছে!');
+      } else {
+        toast.error('মেসেজ পাঠানো ব্যর্থ: ' + JSON.stringify(data));
+      }
+    } catch (err: any) {
+      console.error('Test message error:', err);
+      toast.error('টেস্ট ব্যর্থ: ' + (err.message || 'Unknown error'));
+    } finally {
+      setTestingBot(false);
+    }
+  };
+
+  const handleCopyCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedCommand(cmd);
+    toast.success('কমান্ড কপি হয়েছে!');
+    setTimeout(() => setCopiedCommand(null), 2000);
   };
 
   const toggleSignup = async (val: boolean) => {
@@ -620,29 +695,153 @@ export default function MonthSettings() {
           <Card className="holo-card overflow-hidden animate-fade-in-up">
             <CardHeader>
               <CardTitle className="font-bengali flex items-center gap-2 gradient-text-hero">
-                <Send className="h-5 w-5 text-primary animate-float" /> Telegram রিমাইন্ডার
+                <Bot className="h-5 w-5 text-primary animate-float" /> Telegram বট ও রিমাইন্ডার ইন্টিগ্রেশন
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-xl">
+            <CardContent className="space-y-5 max-w-2xl">
               <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 p-3">
                 <div>
-                  <Label className="font-bengali text-sm">Telegram বট {telegramEnabled ? 'চালু' : 'বন্ধ'}</Label>
+                  <Label className="font-bengali text-sm font-semibold">Telegram বট {telegramEnabled ? 'চালু' : 'বন্ধ'}</Label>
                   <p className="text-xs text-muted-foreground font-bengali mt-0.5">
-                    বন্ধ করলে Telegram-এ কোনো রিমাইন্ডার যাবে না
+                    চালু থাকলে মেম্বাররা Telegram গ্রুপে মেসেজ দিয়ে মিল ও এক্সট্রা পরিবর্তন করতে পারবে
                   </p>
                 </div>
                 <Switch checked={telegramEnabled} onCheckedChange={toggleTelegramEnabled} />
               </div>
+
               <div>
                 <Label className="font-bengali">Telegram Group Chat ID</Label>
-                <Input value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} placeholder="-100xxxxxxxxxx" />
+                <div className="flex gap-2 mt-1">
+                  <Input 
+                    value={telegramChatId} 
+                    onChange={(e) => setTelegramChatId(e.target.value)} 
+                    placeholder="-100xxxxxxxxxx" 
+                    className="font-mono text-sm"
+                  />
+                  <Button onClick={saveTelegramSettings} size="sm" className="font-bengali gap-1 shrink-0">
+                    <Save className="h-4 w-4" /> সেভ করুন
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground font-bengali mt-1">
-                  Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান।
+                  Telegram গ্রুপে @userinfobot অ্যাড করে Chat ID পান (যেমন: <code>-1002233445566</code>)।
                 </p>
               </div>
 
+              {/* Webhook Connection & Testing Controls */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="font-bengali text-sm font-semibold">গ্রুপ মেসেজ Webhook কানেকশন</span>
+                  </div>
+                  {webhookStatus?.url && (
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-xs gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> কানেক্টেড
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground font-bengali">
+                  গ্রুপে মেম্বারদের মেসেজ প্রসেস করার জন্য বটের Webhook এক ক্লিকেই চালু করুন।
+                </p>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={handleSetWebhook}
+                    disabled={webhookConnecting}
+                    className="font-bengali text-xs gap-1.5"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${webhookConnecting ? 'animate-spin' : ''}`} />
+                    {webhookConnecting ? 'কানেক্ট হচ্ছে...' : 'Webhook কানেক্ট করুন'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCheckWebhook}
+                    disabled={webhookConnecting}
+                    className="font-bengali text-xs gap-1.5"
+                  >
+                    স্ট্যাটাস চেক
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSendTestMessage}
+                    disabled={testingBot || !telegramChatId}
+                    className="font-bengali text-xs gap-1.5"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {testingBot ? 'পাঠানো হচ্ছে...' : 'টেস্ট মেসেজ পাঠান'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Supported Bot Commands & Cheatsheet */}
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bengali text-sm font-semibold flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 text-primary" /> গ্রুপে পাঠানোর সহজ মেসেজ ফরম্যাট
+                  </span>
+                  <Badge variant="secondary" className="font-bengali text-xs">
+                    মেম্বারদের সাথে শেয়ার করুন
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {[
+                    { label: '২ লাঞ্চ, ১ ডিনার', cmd: '25 2L 1D' },
+                    { label: '৩ লাঞ্চ, ২ ডিনার', cmd: '25 3L 2D' },
+                    { label: '২ লাঞ্চ', cmd: '25 2L' },
+                    { label: '১টি অতিরিক্ত লাঞ্চ', cmd: '25 +1L' },
+                    { label: 'মিল অন/অফ', cmd: '25 L on D off' },
+                    { label: 'লাঞ্চ মাডি + ডিনার গরু', cmd: '25 L madi D goru' },
+                    { label: '২ লাঞ্চ (মাডি) + ১ ডিনার (গরু)', cmd: '25 2L madi 1D goru' },
+                    { label: 'লাঞ্চে মাডি (ডিম ভাজি)', cmd: '25 L madi' },
+                    { label: 'ডিনারে গরু', cmd: '25 D goru' },
+                    { label: 'লাঞ্চ এক্সট্রা বাতিল', cmd: '25 L extra off' },
+                    { label: 'ডিনার এক্সট্রা বাতিল', cmd: '25 D extra off' },
+                    { label: '🥩 গরু', cmd: '25 on on extra goru' },
+                    { label: '🍖 খাসি', cmd: '25 on on extra khasi' },
+                    { label: '🍗 মুরগি', cmd: '25 on on extra murgi' },
+                    { label: '🍳 ডিম ভাজি - মাছ (মাডি)', cmd: '25 on on madi' },
+                    { label: '🍳 ডিম পোচ - মাছ (মাপো)', cmd: '25 on on mapo' },
+                    { label: '🍳 ডিম ভাজি - পোল্ট্রি (মুডি)', cmd: '25 on on mudi' },
+                    { label: '🍳 ডিম পোচ - পোল্ট্রি (মুপো)', cmd: '25 on on mupo' },
+                    { label: '❌ সকল এক্সট্রা বাতিল', cmd: '25 extra off' },
+                    { label: '📊 মেম্বার স্ট্যাটাস', cmd: '/status 25' },
+                    { label: '📈 অল-ব্যাচ সামারি', cmd: '/summary' },
+                    { label: '❓ বটের সহায়িকা', cmd: '/help' },
+                  ].map((item) => (
+                    <div 
+                      key={item.cmd} 
+                      className="flex items-center justify-between p-2 rounded-lg bg-background/80 border border-border/40 hover:border-primary/40 transition-colors"
+                    >
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-muted-foreground font-bengali block">{item.label}</span>
+                        <code className="text-primary font-mono font-medium">{item.cmd}</code>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => handleCopyCommand(item.cmd)}
+                      >
+                        {copiedCommand === item.cmd ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Schedule times for reminders */}
               <div className="space-y-2 border-t border-border/30 pt-3">
-                <Label className="font-bengali">রিমাইন্ডার পাঠানোর সময়সমূহ</Label>
+                <Label className="font-bengali font-semibold">স্বয়ংক্রিয় রিমাইন্ডার পাঠানোর সময়সমূহ</Label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {telegramScheduleTimes.length === 0 ? (
                     <span className="text-xs text-muted-foreground font-bengali">কোনো সময় সেট করা নেই</span>
@@ -681,15 +880,16 @@ export default function MonthSettings() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground font-bengali mt-1">
-                  এখানে সেট করা সময়গুলোতে (বাংলাদেশ সময় অনুযায়ী) স্বয়ংক্রিয়ভাবে Telegram-এ মিল আপদেশের রিমাইন্ডার যাবে।
+                  এখানে সেট করা সময়গুলোতে (বাংলাদেশ সময় অনুযায়ী) স্বয়ংক্রিয়ভাবে Telegram-এ মিল আপডেটের রিমাইন্ডার যাবে।
                 </p>
               </div>
 
-              <Button onClick={saveTelegramSettings} className="font-bengali gap-1">
-                <Save className="h-4 w-4" /> সেটিংস সেভ করুন
+              <Button onClick={saveTelegramSettings} className="font-bengali gap-1 w-full sm:w-auto">
+                <Save className="h-4 w-4" /> Telegram সেটিংস সেভ করুন
               </Button>
             </CardContent>
           </Card>
+
 
           {/* Meal Cutoff Time */}
           <Card className="holo-card overflow-hidden animate-fade-in-up">

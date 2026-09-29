@@ -17,6 +17,7 @@ import { Plus, CalendarIcon, Utensils, Trash2, Edit2, Check, X } from 'lucide-re
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
 import AdminDeleteConfirm from './AdminDeleteConfirm';
 import { sortByRoll } from '@/lib/sortMembers';
+import { getExtraMealEquivalent, isDefaultFeastDay } from '@/lib/feastDay';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const MONTH_QUERY_LIMIT = 10000;
@@ -97,8 +98,7 @@ export default function ExtraMealManager() {
   };
 
   const isFeastDay = (date: Date) => {
-    const day = getDay(date);
-    return day === 1 || day === 5;
+    return isDefaultFeastDay(date);
   };
 
   const incAddExtra = (value: string) => {
@@ -160,13 +160,15 @@ export default function ExtraMealManager() {
   };
 
   const startEditing = (e: any) => {
+    const isFeast = e.is_feast_day || isDefaultFeastDay(e.meal_date);
+    const equiv = getExtraMealEquivalent(e);
     setEditingId(e.id);
     setEditState({
       quantity: String(e.quantity),
       mealType: e.meal_type,
       reason: e.reason || 'guest',
-      isFeastDay: e.is_feast_day,
-      mealCountEquivalent: String(e.meal_count_equivalent),
+      isFeastDay: isFeast,
+      mealCountEquivalent: String(equiv),
       mealDate: new Date(e.meal_date + 'T00:00:00'),
       extraOptions: (e.extra_option || '').split(',').map((s: string) => s.trim()).filter(Boolean),
     });
@@ -429,11 +431,15 @@ export default function ExtraMealManager() {
                           <Input type="number" min="0.5" step="0.5" value={editState.mealCountEquivalent} onChange={ev => setEditState(s => ({ ...s, mealCountEquivalent: ev.target.value }))} className="w-14 h-7 text-xs" />
                           <span className="text-xs text-muted-foreground">×</span>
                         </div>
-                      ) : (
-                        <Badge variant={e.is_feast_day ? 'destructive' : 'secondary'} className="font-bengali">
-                          {e.quantity * e.meal_count_equivalent} মিল {e.meal_count_equivalent > 1 ? `(×${e.meal_count_equivalent})` : ''}
-                        </Badge>
-                      )}
+                      ) : (() => {
+                        const equiv = getExtraMealEquivalent(e);
+                        const isFeast = e.is_feast_day || isDefaultFeastDay(e.meal_date);
+                        return (
+                          <Badge variant={isFeast ? 'destructive' : 'secondary'} className="font-bengali">
+                            {e.quantity * equiv} মিল {equiv > 1 ? `(×${equiv})` : ''}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
 
                     {/* Items / Extra options */}

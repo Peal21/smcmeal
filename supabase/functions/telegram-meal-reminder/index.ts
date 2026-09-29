@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
     const { data: settings } = await supabase
       .from('app_settings')
-      .select('telegram_chat_id, telegram_enabled')
+      .select('telegram_chat_id, telegram_enabled, telegram_last_summary_message_id')
       .eq('id', 1)
       .single();
 
@@ -59,6 +59,22 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Delete previous summary message if any
+    if (settings?.telegram_last_summary_message_id) {
+      try {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: parseInt(settings.telegram_last_summary_message_id, 10),
+          }),
+        });
+      } catch (e) {
+        console.warn('Delete previous reminder failed:', e);
+      }
     }
 
     const now = new Date();
@@ -93,7 +109,7 @@ Deno.serve(async (req) => {
 
     const { data: tomorrowMeals } = await supabase
       .from('daily_meals')
-      .select('user_id, lunch, dinner, lunch_extra_option')
+      .select('user_id, lunch, dinner, lunch_extra_option, dinner_extra_option')
       .eq('meal_date', tomorrowStr);
 
     const { data: todayMeals } = await supabase
@@ -110,7 +126,9 @@ Deno.serve(async (req) => {
       .from('feast_day_config')
       .select('feast_date')
       .eq('feast_date', tomorrowStr);
-    const isFeastDay = feastConfig && feastConfig.length > 0;
+    const dayOfWeek = new Date(tomorrowStr + 'T00:00:00').getDay();
+    const isDefaultFeast = dayOfWeek === 1 || dayOfWeek === 5;
+    const isFeastDay = Boolean((feastConfig && feastConfig.length > 0) || isDefaultFeast);
 
     const { data: specialItems } = await supabase
       .from('special_day_items')
@@ -266,8 +284,10 @@ Deno.serve(async (req) => {
         if (extraD > 0) dinnerStr += `+${extraD}`;
 
         // Extra options
-        const rawExtraKeys = (meal.lunch_extra_option || '')
-          .split(',').map((v: string) => v.trim()).filter(Boolean);
+        const rawExtraKeys = [
+          ...(meal.lunch_extra_option || '').split(',').map((v: string) => v.trim()).filter(Boolean),
+          ...(meal.dinner_extra_option || '').split(',').map((v: string) => v.trim()).filter(Boolean),
+        ];
         const extraMealKeys = extraOptionMap.get(p.user_id) || [];
         const allRawKeys = [...rawExtraKeys, ...extraMealKeys];
         const displayKeys = isFeastDay ? allRawKeys : allRawKeys.filter((k: string) => k !== 'chicken');
@@ -402,7 +422,7 @@ Deno.serve(async (req) => {
 
     message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     if (notUpdatedCount > 0) {
-      message += `⚠️ <i>মিল আপডেট দিন! রাত ১০тар পর বন্ধ হয়ে যাবে।</i>`;
+      message += `⚠️ <i>মিল আপডেট দিন! রাত ১০টার পর বন্ধ হয়ে যাবে।</i>`;
     } else {
       message += `🎉 <i>সবাই সফলভাবে মিল আপডেট সম্পন্ন করেছেন!</i>`;
     }
@@ -439,7 +459,38 @@ Deno.serve(async (req) => {
       throw new Error(`Telegram API failed [${response.status}]: ${JSON.stringify(data)}`);
     }
 
-    return new Response(JSON.stringify({ ok: true, updated: updatedCount, notUpdated: notUpdatedCount, warnings: warnings.length, chat_id: chatId }), {
+    const newSentMessageId = data?.result?.message_id;
+    if (newSentMessageId) {
+      try {
+        // 1. Unpin previous pinned messages in the chat
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/unpinAllChatMessages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId }),
+        });
+
+        // 2. Pin the new latest reminder message
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/pinChatMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: newSentMessageId,
+            disable_notification: true,
+          }),
+        });
+
+        // 3. Save to app_settings for next auto-deletion
+        await supabase
+          .from('app_settings')
+          .update({ telegram_last_summary_message_id: String(newSentMessageId) })
+          .eq('id', 1);
+      } catch (pinError) {
+        console.warn('Auto pin/unpin failed (bot might need pin permission):', pinError);
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, updated: updatedCount, notUpdated: notUpdatedCount, warnings: warnings.length, chat_id: chatId, pinned_message_id: newSentMessageId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {

@@ -18,6 +18,7 @@ import { generatePaymentExcel } from '@/lib/paymentExcelGenerator';
 import { format } from 'date-fns';
 import { getMealMonthDateRange } from '@/lib/mealMonth';
 import { sortByRoll } from '@/lib/sortMembers';
+import { getExtraMealEquivalent } from '@/lib/feastDay';
 
 const MONTH_QUERY_LIMIT = 10000;
 
@@ -146,7 +147,7 @@ export default function PaymentManagement() {
     });
     extraMeals.forEach(em => {
       const qty = Number(em.quantity) || 0;
-      const equiv = Number(em.meal_count_equivalent) || 1;
+      const equiv = getExtraMealEquivalent(em);
       map.set(em.user_id, (map.get(em.user_id) || 0) + qty * equiv);
     });
     // Apply manual overrides from member_balances (matches BillingManagement / hisab)

@@ -14,6 +14,7 @@ import { format, addDays, getDay } from 'date-fns';
 import { Utensils, Sun, Moon, Users, Calendar, Search, Plus, Minus, Edit2, RefreshCw } from 'lucide-react';
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
 import { sortByRoll } from '@/lib/sortMembers';
+import { getExtraMealEquivalent, isDefaultFeastDay } from '@/lib/feastDay';
 
 const MONTH_QUERY_LIMIT = 10000;
 
@@ -80,7 +81,7 @@ export default function MealOverview() {
     const totalLunch = meals.filter(m => m.lunch).length;
     const totalDinner = meals.filter(m => m.dinner).length;
     const regularMeals = (monthMealsRes.data || []).reduce((a, m) => a + (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0), 0);
-    const extraMeals = (monthExtrasRes.data || []).reduce((a, e) => a + (e.quantity * e.meal_count_equivalent), 0);
+    const extraMeals = (monthExtrasRes.data || []).reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
 
     setStats({ totalLunch, totalDinner, totalMembers: membersRes.count || 0, monthTotalMeals: regularMeals + extraMeals });
   };
@@ -150,8 +151,7 @@ export default function MealOverview() {
   };
 
   const isFeastDay = (dateStr: string) => {
-    const day = getDay(new Date(dateStr));
-    return day === 1 || day === 5;
+    return isDefaultFeastDay(dateStr);
   };
 
   const addExtraMeal = async (userId: string, mealType: 'lunch' | 'dinner') => {
@@ -187,7 +187,12 @@ export default function MealOverview() {
       return;
     }
 
-    const { error } = await supabase.from('extra_meals').update({ quantity: newQty }).eq('id', extraId);
+    const feast = isFeastDay(selectedDate);
+    const { error } = await supabase.from('extra_meals').update({
+      quantity: newQty,
+      is_feast_day: feast,
+      meal_count_equivalent: feast ? 3 : 1,
+    } as any).eq('id', extraId);
     if (error) toast.error(error.message);
     else {
       toast.success('আপডেট হয়েছে');
@@ -343,7 +348,7 @@ export default function MealOverview() {
                   const dinnerExtras = userExtras.filter(e => e.meal_type === 'dinner');
                   const extraLunchQty = lunchExtras.reduce((s, e) => s + e.quantity, 0);
                   const extraDinnerQty = dinnerExtras.reduce((s, e) => s + e.quantity, 0);
-                  const extraMealEquiv = userExtras.reduce((s, e) => s + (e.quantity * e.meal_count_equivalent), 0);
+                  const extraMealEquiv = userExtras.reduce((s, e) => s + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
                   const totalMeals = (meal?.lunch ? 1 : 0) + (meal?.dinner ? 1 : 0) + extraMealEquiv;
                   const lunchOptionLabels = parseOptionLabels(meal?.lunch_extra_option);
                   const dinnerOptionLabels = parseOptionLabels(meal?.dinner_extra_option);

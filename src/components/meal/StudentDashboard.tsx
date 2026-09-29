@@ -19,6 +19,7 @@ import { notifyUpdate } from '@/lib/notify';
 import { format, addDays, isAfter, set, getDay } from 'date-fns';
 import { Sun, Moon, Utensils, Wallet, TrendingUp, Clock, Plus, Minus, Trash2, Edit2, Check, X, AlertTriangle, ShieldAlert, Phone, History, Timer } from 'lucide-react';
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
+import { getExtraMealEquivalent, isDefaultFeastDay } from '@/lib/feastDay';
 import SpecialDayItems from './SpecialDayItems';
 
 const DAY_NAMES_BN = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
@@ -361,7 +362,7 @@ export default function StudentDashboard() {
     const regularMeals = (mealsRes.data || []).reduce((acc, m) => {
       return acc + (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
     }, 0);
-    const extraMealCount = (extraRes.data || []).reduce((a, e) => a + e.quantity * e.meal_count_equivalent, 0);
+    const extraMealCount = (extraRes.data || []).reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
     let totalMeals = regularMeals + extraMealCount;
 
     let totalPaid = 0;
@@ -744,6 +745,10 @@ export default function StudentDashboard() {
     }
 
     const extraOptionStr = pendingExtraOption.join(',');
+    const mealDateObj = new Date(mealDate + 'T00:00:00');
+    const dayOfWeek = mealDateObj.getDay();
+    const isFeast = dayOfWeek === 1 || dayOfWeek === 5;
+    const mealCountEquivalent = isFeast ? 3 : 1;
 
     if (editingExtraMealId) {
       const { error } = await supabase.from('extra_meals').update({
@@ -751,6 +756,8 @@ export default function StudentDashboard() {
         quantity: qty,
         reason: extraReason || null,
         extra_option: extraOptionStr,
+        is_feast_day: isFeast,
+        meal_count_equivalent: mealCountEquivalent,
       } as any).eq('id', editingExtraMealId);
       if (error) { toast.error(error.message); return; }
       playSuccessSound();
@@ -760,15 +767,10 @@ export default function StudentDashboard() {
         quantity: qty,
         extraOption: extraOptionStr,
         mealDate: format(new Date(mealDate + 'T00:00:00'), 'dd MMMM yyyy'),
-        mealCountEquivalent: 1
+        mealCountEquivalent: mealCountEquivalent
       });
       notify('আপডেট হয়েছে');
     } else {
-      const mealDateObj = new Date(mealDate);
-      const dayOfWeek = mealDateObj.getDay();
-      const isFeast = dayOfWeek === 1 || dayOfWeek === 5;
-      const mealCountEquivalent = isFeast ? 3 : 1;
-
       const { error } = await supabase.from('extra_meals').insert({
         user_id: user.id,
         meal_date: mealDate,
@@ -1441,14 +1443,14 @@ export default function StudentDashboard() {
 
                     return sortedDates.map(dateStr => {
                       const m = mealsByDate.get(dateStr) || { meal_date: dateStr, lunch: false, dinner: false, lunch_extra_option: '' };
-                      const d = new Date(dateStr);
+                      const d = new Date(`${dateStr}T00:00:00`);
                       const dayIdx = getDay(d);
                       const isFeast = dayIdx === 1 || dayIdx === 5;
                       const extras = (m.lunch_extra_option || '').split(',').map((s: string) => s.trim()).filter(Boolean);
                       const extraLabels = extras.map((v: string) => EXTRA_LABEL_MAP[v] || v);
                       const dayExtras = historyExtras.filter(e => e.meal_date === dateStr);
                       const regCount = (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
-                      const exCount = dayExtras.reduce((a, e) => a + Number(e.quantity) * Number(e.meal_count_equivalent), 0);
+                      const exCount = dayExtras.reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
                       const dayTotal = regCount + exCount;
 
                       return (
@@ -1465,11 +1467,15 @@ export default function StudentDashboard() {
                             {extraLabels.length > 0 && (
                               <div className="font-bengali text-[10px] text-muted-foreground">{extraLabels.join(', ')}</div>
                             )}
-                            {dayExtras.map(de => (
-                              <Badge key={dateStr + de.meal_type} variant="secondary" className="text-[10px] mr-1 mt-0.5">
-                                {de.meal_type === 'lunch' ? 'L' : 'D'}+{de.quantity}{Number(de.meal_count_equivalent) !== 1 ? `×${de.meal_count_equivalent}` : ''}={Number(de.quantity) * Number(de.meal_count_equivalent)}
-                              </Badge>
-                            ))}
+                            {dayExtras.map(de => {
+                              const equiv = getExtraMealEquivalent(de);
+                              const qty = Number(de.quantity) || 0;
+                              return (
+                                <Badge key={dateStr + de.meal_type} variant="secondary" className="text-[10px] mr-1 mt-0.5">
+                                  {de.meal_type === 'lunch' ? 'L' : 'D'}+{qty}{equiv !== 1 ? `×${equiv}` : ''}={qty * equiv}
+                                </Badge>
+                              );
+                            })}
                           </TableCell>
                           <TableCell className="text-center py-1.5">
                             <Badge variant={isFeast ? 'destructive' : 'outline'} className="text-[10px] font-bold">{dayTotal}</Badge>
@@ -1484,7 +1490,7 @@ export default function StudentDashboard() {
             {/* Month Total Summary */}
             {(() => {
               const regTotal = historyMeals.reduce((a, m) => a + (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0), 0);
-              const exTotal = historyExtras.reduce((a, e) => a + Number(e.quantity) * Number(e.meal_count_equivalent), 0);
+              const exTotal = historyExtras.reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
               let grand = regTotal + exTotal;
               if (historyStats.mealCountOverride !== null) grand = historyStats.mealCountOverride;
               const effective = historyStats.minMeals > 0 && grand < historyStats.minMeals ? historyStats.minMeals : grand;

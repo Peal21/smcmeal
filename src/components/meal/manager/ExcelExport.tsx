@@ -10,6 +10,7 @@ import { FileSpreadsheet, Download, FileText } from 'lucide-react';
 import { generateMealExcel } from '@/lib/excelGenerator';
 import { generateMealPdf } from '@/lib/pdfMealGenerator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { isDefaultFeastDay } from '@/lib/feastDay';
 
 type ExportFormat = 'excel' | 'pdf';
 
@@ -59,8 +60,7 @@ export default function ExcelExport() {
         .in('user_id', userIds),
     ]);
 
-    const dayOfWeek = new Date(selectedDate).getDay();
-    const isFeastDay = dayOfWeek === 1 || dayOfWeek === 5;
+    const isFeastDay = isDefaultFeastDay(selectedDate);
 
     // Build special day data
     const specialItemsList = specialItems || [];

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { format, getDay } from 'date-fns';
 import { getMealMonthDateRange } from '@/lib/mealMonth';
 import { sortByRoll } from '@/lib/sortMembers';
+import { getExtraMealEquivalent, isDefaultFeastDay } from '@/lib/feastDay';
 
 const EXTRA_OPTIONS_MAP: Record<string, string> = {
   beef: 'গরু', mutton: 'খাসি', chicken: 'গরু/খাসির পরিবর্তে মুরগি',
@@ -129,7 +130,8 @@ export default function BillingManagement() {
       mealMap.set(m.user_id, (mealMap.get(m.user_id) || 0) + count);
     });
     extraRes.forEach((e: any) => {
-      mealMap.set(e.user_id, (mealMap.get(e.user_id) || 0) + e.quantity * e.meal_count_equivalent);
+      const equiv = getExtraMealEquivalent(e);
+      mealMap.set(e.user_id, (mealMap.get(e.user_id) || 0) + (Number(e.quantity) || 0) * equiv);
     });
     (balancesRes.data || []).forEach((b: any) => {
       if (b.meal_count_override !== null && b.meal_count_override !== undefined) {
@@ -175,7 +177,8 @@ export default function BillingManagement() {
       userMealMap.set(m.user_id, (userMealMap.get(m.user_id) || 0) + count);
     });
     extraRes.forEach(e => {
-      userMealMap.set(e.user_id, (userMealMap.get(e.user_id) || 0) + e.quantity * e.meal_count_equivalent);
+      const equiv = getExtraMealEquivalent(e);
+      userMealMap.set(e.user_id, (userMealMap.get(e.user_id) || 0) + (Number(e.quantity) || 0) * equiv);
     });
     (balancesRes.data || []).forEach((b: any) => {
       if (b.meal_count_override !== null && b.meal_count_override !== undefined) {
@@ -532,7 +535,7 @@ export default function BillingManagement() {
             }
 
             const totalRegular = userDailyMeals.reduce((a, m) => a + (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0), 0);
-            const totalExtra = userExtras.reduce((a, e) => a + Number(e.quantity) * Number(e.meal_count_equivalent), 0);
+            const totalExtra = userExtras.reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
 
             return (
               <div className="space-y-3">
@@ -563,7 +566,7 @@ export default function BillingManagement() {
                         const extraLabels = extras.map((v: string) => EXTRA_OPTIONS_MAP[v] || v);
                         const dayExtras = userExtras.filter(e => e.meal_date === dateStr);
                         const regCount = (m.lunch ? 1 : 0) + (m.dinner ? 1 : 0);
-                        const exCount = dayExtras.reduce((a, e) => a + Number(e.quantity) * Number(e.meal_count_equivalent), 0);
+                        const exCount = dayExtras.reduce((a, e) => a + (Number(e.quantity) || 0) * getExtraMealEquivalent(e), 0);
                         const dayTotal = regCount + exCount;
 
                         return (
@@ -580,11 +583,15 @@ export default function BillingManagement() {
                               {extraLabels.length > 0 && (
                                 <div className="font-bengali text-[10px] text-muted-foreground">{extraLabels.join(', ')}</div>
                               )}
-                              {dayExtras.map(de => (
-                                <Badge key={dateStr + de.meal_type} variant="secondary" className="text-[10px] mr-1 mt-0.5">
-                                  {de.meal_type === 'lunch' ? 'L' : 'D'}+{de.quantity}{Number(de.meal_count_equivalent) !== 1 ? `×${de.meal_count_equivalent}` : ''}={Number(de.quantity) * Number(de.meal_count_equivalent)}
-                                </Badge>
-                              ))}
+                              {dayExtras.map(de => {
+                                const equiv = getExtraMealEquivalent(de);
+                                const qty = Number(de.quantity) || 0;
+                                return (
+                                  <Badge key={dateStr + de.meal_type} variant="secondary" className="text-[10px] mr-1 mt-0.5">
+                                    {de.meal_type === 'lunch' ? 'L' : 'D'}+{qty}{equiv !== 1 ? `×${equiv}` : ''}={qty * equiv}
+                                  </Badge>
+                                );
+                              })}
                             </TableCell>
                             <TableCell className="text-center py-1">
                               <Badge variant={isFeast ? 'destructive' : 'outline'} className="text-[10px] font-bold">{dayTotal}</Badge>

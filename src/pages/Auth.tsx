@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { UtensilsCrossed, ShieldCheck, Download, LogIn, UserPlus, Lock, Mail, User, GraduationCap, ArrowLeft, Sparkles, Zap, Star, KeyRound, Sun, Moon, Check, Eye, EyeOff, Copy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { generateMealExcel } from '@/lib/excelGenerator';
+import { isDefaultFeastDay } from '@/lib/feastDay';
 import { playClickSound, playSuccessSound } from '@/lib/sounds';
 
 /* ───── Animated particles ───── */
@@ -838,8 +839,7 @@ export default function Auth() {
               const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co"}/functions/v1/download-meal-sheet?gender=male`);
               if (!res.ok) throw new Error('No data');
               const { profiles, meals, extraMeals, date } = await res.json();
-              const dayOfWeek = new Date(date).getDay();
-              const isFeastDay = dayOfWeek === 1 || dayOfWeek === 5;
+              const isFeastDay = isDefaultFeastDay(date);
               await generateMealExcel(profiles, meals, 'male', ['1st','2nd','3rd','4th','5th','extra'], date, 'boys_all', extraMeals || [], isFeastDay);
               toast.success('Boys Excel ডাউনলোড হয়েছে!');
             } catch { toast.error('ডাটা পাওয়া যায়নি'); }
@@ -855,8 +855,7 @@ export default function Auth() {
               const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://hcbsbgjlkqugwlkilinq.supabase.co"}/functions/v1/download-meal-sheet?gender=female`);
               if (!res.ok) throw new Error('No data');
               const { profiles, meals, extraMeals, date } = await res.json();
-              const dayOfWeek = new Date(date).getDay();
-              const isFeastDay = dayOfWeek === 1 || dayOfWeek === 5;
+              const isFeastDay = isDefaultFeastDay(date);
               await generateMealExcel(profiles, meals, 'female', ['1st','2nd','3rd','4th','5th','extra'], date, 'girls_all', extraMeals || [], isFeastDay);
               toast.success('Girls Excel ডাউনলোড হয়েছে!');
             } catch { toast.error('ডাটা পাওয়া যায়নি'); }

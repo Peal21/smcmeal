@@ -1178,5 +1178,42 @@ SELECT cron.schedule(
   $cron$
 );
 
+-- ===== Migration: 20260929153000_fix_feast_day_extra_meals.sql =====
+CREATE OR REPLACE FUNCTION public.set_extra_meal_feast_defaults()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_mce numeric;
+BEGIN
+  SELECT meal_count_equivalent INTO v_mce
+  FROM public.feast_day_config
+  WHERE feast_date = NEW.meal_date
+    AND (meal_type = 'both' OR meal_type = NEW.meal_type)
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF v_mce IS NOT NULL THEN
+    NEW.is_feast_day := (v_mce > 1);
+    NEW.meal_count_equivalent := v_mce;
+  ELSIF EXTRACT(DOW FROM NEW.meal_date) IN (1, 5) THEN
+    NEW.is_feast_day := true;
+    NEW.meal_count_equivalent := 3;
+  ELSE
+    IF NEW.meal_count_equivalent IS NULL OR NEW.meal_count_equivalent <= 0 THEN
+      NEW.meal_count_equivalent := 1;
+      NEW.is_feast_day := false;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_extra_meal_feast_defaults ON public.extra_meals;
+CREATE TRIGGER trg_set_extra_meal_feast_defaults
+BEFORE INSERT OR UPDATE OF meal_date, meal_type, quantity
+ON public.extra_meals
+FOR EACH ROW
+EXECUTE FUNCTION public.set_extra_meal_feast_defaults();
+
 
 
