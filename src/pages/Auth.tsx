@@ -17,13 +17,14 @@ import { playClickSound, playSuccessSound } from '@/lib/sounds';
 /* ───── Animated particles ───── */
 function FloatingParticles() {
   const particles = useMemo(() =>
-    Array.from({ length: 30 }, (_, i) => ({
+    Array.from({ length: 45 }, (_, i) => ({
       id: i,
       left: `${Math.random() * 100}%`,
-      size: 2 + Math.random() * 4,
-      delay: `${Math.random() * 6}s`,
-      duration: `${4 + Math.random() * 6}s`,
-      opacity: 0.15 + Math.random() * 0.3,
+      size: 1.5 + Math.random() * 5,
+      delay: `${Math.random() * 8}s`,
+      duration: `${3 + Math.random() * 7}s`,
+      opacity: 0.1 + Math.random() * 0.35,
+      color: i % 3 === 0 ? 'var(--primary)' : i % 3 === 1 ? 'var(--accent)' : 'var(--info)',
     })), []);
 
   return (
@@ -40,6 +41,7 @@ function FloatingParticles() {
             animationDuration: p.duration,
             opacity: p.opacity,
             bottom: 0,
+            background: `radial-gradient(circle, hsla(${p.color === 'var(--accent)' ? '28,92%,54%' : p.color === 'var(--info)' ? '198,85%,48%' : '158,64%,36%'},0.8), transparent)`,
           }}
         />
       ))}
@@ -380,22 +382,52 @@ export default function Auth() {
       <div className="absolute inset-0 aurora-bg" />
       <div className="absolute inset-0 cyber-grid" />
 
-      {/* ══════ BACKGROUND DINING IMAGE ══════ */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-[0.25] dark:opacity-[0.14]">
-        <img 
-          src="/dining.png" 
-          alt="SMC Dining Background" 
-          className="w-full h-full object-cover scale-105 filter blur-[1.5px] dark:blur-[2.5px] transition-all duration-1000"
+      {/* ══════ SMC COLLEGE ROTATING PHOTO BACKGROUNDS ══════ */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        {/* Image 1: Main building */}
+        <div
+          className="absolute inset-0 smc-slide-1"
+          style={{
+            backgroundImage: 'url(/smc_main.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center top',
+            filter: 'blur(2px) brightness(0.22) saturate(1.3)',
+            transform: 'scale(1.06)',
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-tr from-background/30 via-background/10 to-background/40" />
+        {/* Image 2: Evening campus */}
+        <div
+          className="absolute inset-0 smc-slide-2"
+          style={{
+            backgroundImage: 'url(/smc_evening.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(2px) brightness(0.2) saturate(1.4)',
+            transform: 'scale(1.06)',
+          }}
+        />
+        {/* Image 3: Dining hall */}
+        <div
+          className="absolute inset-0 smc-slide-3"
+          style={{
+            backgroundImage: 'url(/smc_dining.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(2px) brightness(0.18) saturate(1.2)',
+            transform: 'scale(1.06)',
+          }}
+        />
+        {/* Gradient overlay on top of photos */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background/60 via-background/30 to-background/70" />
       </div>
 
       {/* Morphing blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/8 blob" />
-        <div className="absolute top-1/3 -right-24 w-72 h-72 bg-accent/8 blob" style={{ animationDelay: '-3s' }} />
-        <div className="absolute -bottom-24 left-1/4 w-80 h-80 bg-info/6 blob" style={{ animationDelay: '-6s' }} />
-        <div className="absolute top-2/3 right-1/4 w-64 h-64 bg-destructive/4 blob" style={{ animationDelay: '-1.5s' }} />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-primary/10 blob" />
+        <div className="absolute top-1/3 -right-24 w-72 h-72 bg-accent/10 blob" style={{ animationDelay: '-3s' }} />
+        <div className="absolute -bottom-24 left-1/4 w-80 h-80 bg-info/8 blob" style={{ animationDelay: '-6s' }} />
+        <div className="absolute top-2/3 right-1/4 w-64 h-64 bg-destructive/5 blob" style={{ animationDelay: '-1.5s' }} />
+        <div className="absolute top-1/4 left-1/2 w-56 h-56 bg-primary/6 blob" style={{ animationDelay: '-4s' }} />
       </div>
 
       {/* Floating particles */}
@@ -435,27 +467,49 @@ export default function Auth() {
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
         <div className={`w-full max-w-md transition-all duration-1000 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           
+          {/* ── College Photo Strip Banner ── */}
+          <div className="relative mb-5 rounded-2xl overflow-hidden h-28 shadow-2xl animate-fade-in-down" style={{ animationDelay: '0s' }}>
+            {/* Rotating college photos */}
+            <div className="absolute inset-0 smc-slide-1" style={{ backgroundImage: 'url(/smc_main.jpg)', backgroundSize: 'cover', backgroundPosition: 'center 30%' }} />
+            <div className="absolute inset-0 smc-slide-2" style={{ backgroundImage: 'url(/smc_evening.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            <div className="absolute inset-0 smc-slide-3" style={{ backgroundImage: 'url(/smc_dining.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
+            {/* Content */}
+            <div className="absolute inset-0 flex flex-col items-center justify-end pb-3">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-info flex items-center justify-center shadow-lg shadow-primary/40 neon-pulse">
+                  <UtensilsCrossed className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="text-white font-bengali font-bold text-sm drop-shadow-lg">সাতক্ষীরা মেডিকেল কলেজ</span>
+              </div>
+              <span className="text-white/70 text-[10px] font-bengali mt-0.5">Satkhira Medical College • Est. 2011</span>
+            </div>
+            {/* Shimmer effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent shimmer-bg" />
+          </div>
+
           {/* ── Logo & Title ── */}
-          <div className="text-center mb-8">
-            <div className="mx-auto mb-5 relative">
+          <div className="text-center mb-6">
+            <div className="mx-auto mb-4 relative">
               {/* Pulsing rings behind logo */}
               <div className="absolute inset-0 mx-auto h-20 w-20 flex items-center justify-center" style={{ top: -2, left: 'calc(50% - 40px)' }}>
-                <div className="absolute h-20 w-20 rounded-2xl border-2 border-primary/20 animate-pulse-ring" />
+                <div className="absolute h-24 w-24 rounded-2xl border-2 border-primary/15 animate-pulse-ring" />
                 <div className="absolute h-20 w-20 rounded-2xl border-2 border-primary/10 animate-pulse-ring" style={{ animationDelay: '0.5s' }} />
-                <div className="absolute h-20 w-20 rounded-2xl border-2 border-primary/5 animate-pulse-ring" style={{ animationDelay: '1s' }} />
+                <div className="absolute h-16 w-16 rounded-2xl border border-accent/10 animate-pulse-ring" style={{ animationDelay: '1s' }} />
               </div>
               
-              <div className="mx-auto flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary to-info shadow-2xl shadow-primary/40 animate-bounce-in animate-rotate-3d relative overflow-hidden">
+              <div className="mx-auto flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary to-info shadow-2xl shadow-primary/40 animate-bounce-in animate-rotate-3d relative overflow-hidden neon-pulse">
                 <UtensilsCrossed className="h-9 w-9 text-primary-foreground relative z-10" />
                 {/* Holographic shine */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%', animation: 'shimmer 3s ease-in-out infinite' }} />
+                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/25 to-transparent" style={{ backgroundSize: '200% 100%', animation: 'shimmer 2.5s ease-in-out infinite' }} />
               </div>
             </div>
 
             <h1 className="text-3xl font-extrabold font-bengali gradient-text-hero animate-fade-in-down" style={{ animationDelay: '0.3s' }}>
               সাতক্ষীরা মেডিকেল কলেজ
             </h1>
-            <p className="text-sm text-muted-foreground font-bengali mt-2 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+            <p className="text-sm text-muted-foreground font-bengali mt-1.5 animate-fade-in" style={{ animationDelay: '0.6s' }}>
               <span className="inline-flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-accent animate-glow-pulse" />
                 মিল ম্যানেজমেন্ট সিস্টেম
@@ -465,7 +519,7 @@ export default function Auth() {
           </div>
 
           {/* ── Auth Card ── */}
-          <Card className="holo-card border-0 shadow-2xl animate-scale-in scan-line rounded-2xl" style={{ animationDelay: '0.4s' }}>
+          <Card className="holo-card border-0 shadow-2xl animate-scale-in scan-line rounded-2xl animated-border" style={{ animationDelay: '0.4s' }}>
             <CardContent className="p-0">
               <Tabs defaultValue="login" onValueChange={() => playClickSound()} className="w-full">
                 <TabsList className={`grid w-full ${signupEnabled ? 'grid-cols-3' : 'grid-cols-2'} rounded-none bg-secondary/30 backdrop-blur-sm p-1 h-auto`}>
@@ -527,7 +581,7 @@ export default function Auth() {
                                 />
                               </div>
                             </div>
-                            <Button type="submit" className="w-full font-bengali h-11 rounded-xl bg-gradient-to-r from-primary to-info hover:shadow-lg hover:shadow-primary/30 transition-all duration-300 hover:scale-[1.02]" disabled={loading}>
+                            <Button type="submit" className="w-full font-bengali h-11 rounded-xl bg-gradient-to-r from-primary to-info hover:shadow-lg hover:shadow-primary/30 transition-all duration-300 hover:scale-[1.02] haptic-btn touch-ripple" disabled={loading}>
                               {loading ? <LoadingSpinner /> : '📧 ওটিপি কোড পাঠান'}
                             </Button>
                             <Button type="button" variant="ghost" className="w-full font-bengali text-sm gap-1" onClick={resetForgotState}>
@@ -711,7 +765,7 @@ export default function Auth() {
                             </button>
                           </div>
                         </div>
-                        <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-primary via-primary to-info text-primary-foreground hover:shadow-xl hover:shadow-primary/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold" disabled={loading}>
+                        <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-primary via-primary to-info text-primary-foreground hover:shadow-xl hover:shadow-primary/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold haptic-btn touch-ripple" disabled={loading}>
                           {loading ? <LoadingSpinner /> : <><LogIn className="h-4 w-4" /> লগইন করুন</>}
                         </Button>
                         <button type="button" className="w-full text-sm text-primary hover:text-primary/80 font-bengali transition-all py-1 hover:tracking-wide" onClick={() => setShowForgot(true)}>
@@ -774,7 +828,7 @@ export default function Auth() {
                           </Select>
                         </div>
                       </div>
-                      <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-primary via-primary to-info text-primary-foreground hover:shadow-xl hover:shadow-primary/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold" disabled={loading}>
+                      <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-primary via-primary to-info text-primary-foreground hover:shadow-xl hover:shadow-primary/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold haptic-btn touch-ripple" disabled={loading}>
                         {loading ? <LoadingSpinner /> : <><UserPlus className="h-4 w-4" /> রেজিস্ট্রেশন করুন</>}
                       </Button>
                     </form>
@@ -808,7 +862,7 @@ export default function Auth() {
                           <Input type="password" value={adminPortalPassword} onChange={e => setAdminPortalPassword(e.target.value)} className={inputCls} placeholder="সুপার অ্যাডমিন/মাস্টার হলে খালি রাখুন" />
                         </div>
                       </div>
-                      <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-destructive via-destructive to-destructive/70 text-destructive-foreground hover:shadow-xl hover:shadow-destructive/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold" disabled={loading}>
+                      <Button type="submit" className="w-full font-bengali h-12 rounded-xl bg-gradient-to-r from-destructive via-destructive to-destructive/70 text-destructive-foreground hover:shadow-xl hover:shadow-destructive/30 transition-all duration-500 hover:scale-[1.02] gap-2 text-base font-semibold haptic-btn touch-ripple" disabled={loading}>
                         {loading ? <LoadingSpinner /> : <><ShieldCheck className="h-4 w-4" /> অ্যাডমিন লগইন</>}
                       </Button>
                     </form>
@@ -818,8 +872,26 @@ export default function Auth() {
             </CardContent>
           </Card>
 
+          {/* ── College Photo Thumbnails ── */}
+          <div className="grid grid-cols-5 gap-1.5 mt-4 animate-fade-in" style={{ animationDelay: '0.9s' }}>
+            {[
+              { src: '/smc_1.jpg', label: 'মেইন ভবন' },
+              { src: '/smc_2.jpg', label: 'ক্যাম্পাস' },
+              { src: '/smc_3.jpg', label: 'ডাইনিং' },
+              { src: '/smc_4.jpg', label: 'হোস্টেল' },
+              { src: '/smc_5.jpg', label: 'সন্ধ্যা' },
+            ].map(({ src, label }) => (
+              <div key={src} className="relative rounded-xl overflow-hidden h-14 photo-strip cursor-pointer shadow-md group">
+                <img src={src} alt={label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-115" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-1">
+                  <span className="text-white text-[8.5px] font-bengali font-semibold truncate px-0.5">{label}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* ── Footer ── */}
-          <div className="text-center mt-6 animate-fade-in space-y-1" style={{ animationDelay: '0.8s' }}>
+          <div className="text-center mt-4 animate-fade-in space-y-1" style={{ animationDelay: '1s' }}>
             <p className="text-xs text-muted-foreground font-bengali">
               © ২০২৫ সাতক্ষীরা মেডিকেল কলেজ মিল ম্যানেজমেন্ট
             </p>

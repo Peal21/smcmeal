@@ -596,8 +596,272 @@
   animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+
 @keyframes badge-pop {
   0% { transform: scale(0); opacity: 0; }
   60% { transform: scale(1.2); }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* ===== SMC COLLEGE BACKGROUNDS ===== */
+.smc-bg-main {
+  background-image: url('/smc_main.jpg');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+.smc-bg-evening {
+  background-image: url('/smc_evening.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.smc-bg-dining {
+  background-image: url('/smc_dining.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ===== ROTATING BACKGROUND CROSSFADE (5 PHOTOS) ===== */
+@keyframes bg-crossfade-1 { 0%, 15% { opacity: 1; } 20%, 95% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes bg-crossfade-2 { 0%, 15% { opacity: 0; } 20%, 35% { opacity: 1; } 40%, 100% { opacity: 0; } }
+@keyframes bg-crossfade-3 { 0%, 35% { opacity: 0; } 40%, 55% { opacity: 1; } 60%, 100% { opacity: 0; } }
+@keyframes bg-crossfade-4 { 0%, 55% { opacity: 0; } 60%, 75% { opacity: 1; } 80%, 100% { opacity: 0; } }
+@keyframes bg-crossfade-5 { 0%, 75% { opacity: 0; } 80%, 95% { opacity: 1; } 100% { opacity: 0; } }
+
+.smc-slide-1 { animation: bg-crossfade-1 25s ease-in-out infinite; }
+.smc-slide-2 { animation: bg-crossfade-2 25s ease-in-out infinite; }
+.smc-slide-3 { animation: bg-crossfade-3 25s ease-in-out infinite; }
+.smc-slide-4 { animation: bg-crossfade-4 25s ease-in-out infinite; }
+.smc-slide-5 { animation: bg-crossfade-5 25s ease-in-out infinite; }
+
+/* ===== PARALLAX BG ===== */
+.smc-photo-parallax {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  transform: scale(1.06);
+  z-index: 0;
+  transition: opacity 1.2s ease;
+}
+
+/* ===== TOUCH RIPPLE ===== */
+.touch-ripple {
+  position: relative;
+  overflow: hidden;
+}
+@keyframes ripple-out {
+  from { transform: scale(0); opacity: 0.5; }
+  to   { transform: scale(4); opacity: 0; }
+}
+
+/* ===== HAPTIC BUTTON ===== */
+.haptic-btn {
+  will-change: transform;
+}
+.haptic-btn:active {
+  transform: scale(0.94) !important;
+  transition: transform 0.08s ease !important;
+}
+
+/* ===== NEON PULSE ===== */
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px hsla(var(--primary),0.4), 0 0 10px hsla(var(--primary),0.2);
+  }
+  50% {
+    box-shadow: 0 0 10px hsla(var(--primary),0.7), 0 0 25px hsla(var(--primary),0.4), 0 0 50px hsla(var(--primary),0.2);
+  }
+}
+.neon-pulse { animation: neon-pulse 2.5s ease-in-out infinite; }
+
+/* ===== HERO ENTRANCE ===== */
+@keyframes hero-entrance {
+  0%   { opacity: 0; transform: translateY(30px) scale(0.96); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.hero-entrance {
+  animation: hero-entrance 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* ===== GLASS PREMIUM ===== */
+.glass-premium {
+  background: rgba(255,255,255,0.14);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.dark .glass-premium {
+  background: rgba(10,15,30,0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* ===== SPRING SCALE ===== */
+@keyframes spring-scale {
+  0%   { transform: scale(0); }
+  50%  { transform: scale(1.12); }
+  70%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+.spring-scale { animation: spring-scale 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* ===== SLIDE REVEAL ===== */
+@keyframes slide-reveal {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; }
+  100% { clip-path: inset(0 0% 0 0);   opacity: 1; }
+}
+.slide-reveal { animation: slide-reveal 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+
+/* ===== FLOAT BADGE ===== */
+@keyframes float-badge {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-6px) rotate(2deg); }
+}
+.float-badge { animation: float-badge 3s ease-in-out infinite; }
+
+/* ===== SKELETON LOADER ===== */
+@keyframes skeleton-wave {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--secondary)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* ===== PROGRESS FILL ===== */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--progress-width, 100%); }
+}
+.progress-animated { animation: progress-fill 1.2s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+
+/* ===== INPUT FOCUS GLOW ===== */
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 2px hsla(var(--primary), 0.15), 0 0 20px hsla(var(--primary), 0.1) !important;
+}
+
+/* ===== MOBILE SAFE AREA ===== */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-top    { padding-top:    env(safe-area-inset-top, 0px); }
+
+/* ===== TAP FEEDBACK ===== */
+@keyframes tap-vibrate {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-2px); }
+  75%     { transform: translateX(2px); }
+}
+
+/* ===== COLLEGE OVERLAY ===== */
+.college-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.5) 0%,
+    rgba(0,0,0,0.25) 40%,
+    rgba(0,0,0,0.6) 100%
+  );
+}
+
+/* ===== TILT CARD ===== */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.tilt-card:hover {
+  transform: perspective(1000px) rotateX(3deg) rotateY(-3deg) translateZ(12px);
+}
+
+/* ===== ANIMATED GRADIENT BORDER ===== */
+@keyframes border-rotate {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+.animated-border {
+  position: relative;
+}
+.animated-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--info)), hsl(var(--primary)));
+  background-size: 300% 300%;
+  border-radius: inherit;
+  z-index: -1;
+  animation: gradient-shift 4s ease infinite, border-rotate 8s linear infinite;
+  filter: blur(1px);
+}
+
+/* ===== COUNT-UP NUMBER ===== */
+@keyframes count-bounce {
+  0%   { transform: scale(0.6) translateY(10px); opacity: 0; }
+  60%  { transform: scale(1.15) translateY(-3px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.count-bounce { animation: count-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* ===== MOBILE SWIPE CARD ===== */
+.swipe-card {
+  touch-action: pan-y;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+.swipe-card:active { transform: scale(0.97); }
+
+/* ===== BOTTOM SHEET ===== */
+@keyframes sheet-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.sheet-up { animation: sheet-up 0.35s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+
+/* ===== LOADING DOTS ===== */
+@keyframes dot-jump {
+  0%, 80%, 100% { transform: scale(0); opacity: 0; }
+  40%           { transform: scale(1); opacity: 1; }
+}
+.loading-dot-1 { animation: dot-jump 1.4s ease-in-out 0s infinite; }
+.loading-dot-2 { animation: dot-jump 1.4s ease-in-out 0.2s infinite; }
+.loading-dot-3 { animation: dot-jump 1.4s ease-in-out 0.4s infinite; }
+
+/* ===== PHOTO STRIP HOVER ===== */
+.photo-strip {
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.4s ease;
+  filter: brightness(0.85) saturate(0.9);
+}
+.photo-strip:hover {
+  transform: scale(1.03) translateY(-4px);
+  filter: brightness(1) saturate(1.1);
+}
+
+/* ===== WAVE TEXT ===== */
+@keyframes wave-text {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.wave-text span {
+  display: inline-block;
+  animation: wave-text 1.5s ease-in-out infinite;
+}
+.wave-text span:nth-child(2) { animation-delay: 0.1s; }
+.wave-text span:nth-child(3) { animation-delay: 0.2s; }
+.wave-text span:nth-child(4) { animation-delay: 0.3s; }
+.wave-text span:nth-child(5) { animation-delay: 0.4s; }
+
+/* ===== BG PULSE SLOW ===== */
+@keyframes bg-pulse {
+  0%, 100% { opacity: 0.04; }
+  50%      { opacity: 0.1; }
+}
+.bg-pulse-slow { animation: bg-pulse 6s ease-in-out infinite; }
+

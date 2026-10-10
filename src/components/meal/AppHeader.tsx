@@ -10,14 +10,32 @@ export default function AppHeader() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="border-b border-border/30 sticky top-0 z-50 glass-card rounded-none border-x-0 border-t-0">
+    <header className="border-b border-border/30 sticky top-0 z-50 relative overflow-hidden">
+      {/* College photo as very subtle header background */}
+      <div
+        className="absolute inset-0 smc-slide-1 opacity-[0.06] dark:opacity-[0.04]"
+        style={{
+          backgroundImage: 'url(/smc_1.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 30%',
+          filter: 'saturate(1.2)',
+        }}
+      />
+      <div className="absolute inset-0 glass-card rounded-none border-x-0 border-t-0" />
+
       {/* Animated top border gradient */}
-      <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-primary via-accent to-info bg-[length:200%_100%] animate-gradient-shift" />
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-accent to-info bg-[length:200%_100%] animate-gradient-shift" />
       
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between max-w-7xl">
+      <div className="relative container mx-auto px-4 py-3 flex items-center justify-between max-w-7xl">
         <div className="flex items-center gap-3 animate-fade-in-left">
-          <div className="relative group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary to-info shadow-lg shadow-primary/25 transition-all duration-500 group-hover:shadow-xl group-hover:shadow-primary/40 group-hover:scale-110 group-hover:rotate-3 animate-rotate-3d" style={{ animationDuration: '12s' }}>
+          {/* College building thumbnail */}
+          <div className="hidden sm:block relative w-10 h-10 rounded-xl overflow-hidden shadow-md ring-2 ring-primary/20 flex-shrink-0">
+            <img src="/smc_1.jpg" alt="SMC" className="w-full h-full object-cover object-top" />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent" />
+          </div>
+
+          <div className="relative group flex-shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary to-info shadow-lg shadow-primary/25 transition-all duration-500 group-hover:shadow-xl group-hover:shadow-primary/40 group-hover:scale-110 group-hover:rotate-3 animate-rotate-3d neon-pulse" style={{ animationDuration: '12s' }}>
               <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent animate-glow-pulse" />
@@ -41,7 +59,7 @@ export default function AppHeader() {
                 playClickSound();
                 if (adminMode) disableAdminMode(); else enableAdminMode();
               }}
-              className={`font-bengali h-8 text-[11px] px-2.5 rounded-xl border border-primary/20 hover:scale-105 transition-all duration-300 flex items-center gap-1.5 shadow-sm ${
+              className={`font-bengali h-8 text-[11px] px-2.5 rounded-xl border border-primary/20 hover:scale-105 transition-all duration-300 flex items-center gap-1.5 shadow-sm haptic-btn ${
                 adminMode 
                   ? 'bg-gradient-to-r from-primary/10 to-info/10 text-primary hover:bg-primary/25 border-primary/30' 
                   : 'bg-gradient-to-r from-accent/10 to-warning/10 text-accent-foreground hover:bg-accent/25 border-accent/30'
@@ -69,7 +87,7 @@ export default function AppHeader() {
               playClickSound();
               setTheme(theme === 'dark' ? 'light' : 'dark');
             }}
-            className="h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:rotate-45"
+            className="h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:rotate-45 haptic-btn"
             title="Theme Switcher"
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -78,7 +96,7 @@ export default function AppHeader() {
 
           {/* User profile info */}
           <div className="hidden xs:flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-info/10 border border-primary/20 transition-all duration-300 hover:scale-110">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-info/10 border border-primary/20 transition-all duration-300 hover:scale-110 hover:border-primary/40">
               <User className="h-3.5 w-3.5 text-primary" />
             </div>
             <div className="flex flex-col">
@@ -93,7 +111,7 @@ export default function AppHeader() {
           <Button variant="ghost" size="icon" onClick={() => {
             playClickSound();
             signOut();
-          }} className="h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all duration-500 hover:rotate-12 hover:scale-110" title="Logout">
+          }} className="h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all duration-500 hover:rotate-12 hover:scale-110 haptic-btn" title="Logout">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
@@ -101,3 +119,5 @@ export default function AppHeader() {
     </header>
   );
 }
+
+

@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner';
 import { notifyUpdate, sendTelegramMealNotification } from '@/lib/notify';
 import { format, addDays, isAfter, set, getDay } from 'date-fns';
-import { Sun, Moon, Utensils, Wallet, TrendingUp, Clock, Plus, Minus, Trash2, Edit2, Check, X, AlertTriangle, ShieldAlert, Phone, History, Timer } from 'lucide-react';
+import { Sun, Moon, Utensils, Wallet, TrendingUp, Clock, Plus, Minus, Trash2, Edit2, Check, X, AlertTriangle, ShieldAlert, Phone, History, Timer, Sparkles, GraduationCap, Image as ImageIcon, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { fetchResolvedMealMonth, getMealMonthDateRange } from '@/lib/mealMonth';
 import { getExtraMealEquivalent, isDefaultFeastDay } from '@/lib/feastDay';
 import SpecialDayItems from './SpecialDayItems';
@@ -115,6 +115,16 @@ export default function StudentDashboard() {
   const notified945 = useRef(false);
   const [cutoffTime, setCutoffTime] = useState<CutoffTime>({ hour: 22, minute: 0 });
   const [offModeDialog, setOffModeDialog] = useState<{ open: boolean; type: 'lunch' | 'dinner' | null }>({ open: false, type: null });
+  const [showGalleryDialog, setShowGalleryDialog] = useState(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+
+  const smcPhotos = [
+    { src: '/smc_1.jpg', title: 'সাতক্ষীরা মেডিকেল কলেজ মেইন ভবন', subtitle: 'প্রশাসনিক ও একাডেমিক কম্প্লেক্স' },
+    { src: '/smc_2.jpg', title: 'ক্যাম্পাস প্রাঙ্গণ ও চত্বর', subtitle: 'সবুজ মনোরম পরিবেশ' },
+    { src: '/smc_3.jpg', title: 'ডাইনিং হল ও মিল কর্নার', subtitle: 'ছাত্র হোস্টেল ও ক্যাফেটেরিয়া' },
+    { src: '/smc_4.jpg', title: 'হোস্টেল চত্বর ও সড়ক', subtitle: 'মেডিকেল শিক্ষার্থীদের আবাসন' },
+    { src: '/smc_5.jpg', title: 'গোধূলি আলোয় শান্ত ক্যাম্পাস', subtitle: 'সন্ধ্যায় দৃষ্টিনন্দন সাতক্ষীরা মেডিকেল কলেজ' },
+  ];
 
   const getSelectedExtras = (mealType: 'lunch' | 'dinner' = 'lunch'): string[] => {
     const raw = mealType === 'dinner' ? todayMeal?.dinner_extra_option : todayMeal?.lunch_extra_option;
@@ -874,6 +884,184 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-5 page-enter stagger-children">
+      {/* ══════ SMC STUDENT WELCOME HERO BANNER ══════ */}
+      <div className="relative overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-card/90 via-card/80 to-primary/10 backdrop-blur-xl shadow-xl shadow-primary/5 p-4 sm:p-6 transition-all duration-500 hover:shadow-2xl hover:border-primary/40 group">
+        {/* Background photo blend */}
+        <div
+          className="absolute inset-0 opacity-10 dark:opacity-15 bg-cover bg-center transition-transform duration-1000 group-hover:scale-105 pointer-events-none"
+          style={{ backgroundImage: `url(${smcPhotos[activePhotoIdx].src})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-card/95 via-card/85 to-transparent pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          {/* Left: Student info & greeting */}
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="relative flex-shrink-0">
+              <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary to-info text-white shadow-lg shadow-primary/30 ring-2 ring-primary/20 group-hover:scale-105 transition-all duration-300">
+                <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8" />
+              </div>
+              <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 ring-2 ring-background" />
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className="font-bengali text-[10px] bg-primary/20 text-primary border-primary/30 gap-1">
+                  <Sparkles className="h-2.5 w-2.5" /> শিক্ষার্থী পোর্টাল
+                </Badge>
+                {profile?.room_number && (
+                  <Badge variant="outline" className="font-bengali text-[10px] border-border/60">
+                    রুম: {profile.room_number}
+                  </Badge>
+                )}
+                {profile?.roll_number && (
+                  <Badge variant="secondary" className="font-bengali text-[10px] bg-secondary/80 font-mono">
+                    রোল: {profile.roll_number}
+                  </Badge>
+                )}
+              </div>
+              <h2 className="text-lg sm:text-2xl font-extrabold font-bengali tracking-tight text-foreground flex items-center gap-2">
+                <span>{profile?.full_name || 'শিক্ষার্থী'}</span>
+              </h2>
+              <p className="text-xs text-muted-foreground font-bengali flex items-center gap-1.5">
+                <span>সাতক্ষীরা মেডিকেল কলেজ হোস্টেল</span>
+                <span>•</span>
+                <span className="text-primary font-medium">{format(new Date(), 'EEEE, dd MMMM yyyy')}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Right: SMC Campus Photo Strip & Preview */}
+          <div className="flex items-center gap-3 self-stretch md:self-auto justify-between sm:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-border/30">
+            {/* Active photo thumbnail card */}
+            <div
+              onClick={() => setShowGalleryDialog(true)}
+              className="relative h-16 sm:h-20 w-32 sm:w-44 rounded-2xl overflow-hidden cursor-pointer shadow-md group/photo ring-2 ring-primary/20 hover:ring-primary/50 transition-all duration-300 hover:scale-105 flex-shrink-0"
+              title="ক্যাম্পাস ফটো গ্যালারি দেখুন"
+            >
+              <img
+                src={smcPhotos[activePhotoIdx].src}
+                alt={smcPhotos[activePhotoIdx].title}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover/photo:scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-1.5">
+                <span className="text-white text-[10px] font-bengali font-bold truncate flex items-center gap-1">
+                  <Eye className="h-2.5 w-2.5 text-primary" /> {smcPhotos[activePhotoIdx].title}
+                </span>
+                <span className="text-white/70 text-[8px] font-bengali">ক্যাম্পাস ভিউ ({activePhotoIdx + 1}/5)</span>
+              </div>
+            </div>
+
+            {/* Photo switcher controls */}
+            <div className="flex flex-col gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowGalleryDialog(true)}
+                className="h-8 text-xs font-bengali rounded-xl gap-1.5 border-primary/30 text-primary hover:bg-primary/10 haptic-btn"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                <span>৫টি ফটো</span>
+              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setActivePhotoIdx(p => (p === 0 ? smcPhotos.length - 1 : p - 1))}
+                  className="h-6 w-6 rounded-lg hover:bg-primary/10 haptic-btn"
+                  title="পূর্ববর্তী ছবি"
+                >
+                  <ChevronLeft className="h-3 w-3" />
+                </Button>
+                <span className="text-[10px] text-muted-foreground font-mono px-1">
+                  {activePhotoIdx + 1}/{smcPhotos.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setActivePhotoIdx(p => (p === smcPhotos.length - 1 ? 0 : p + 1))}
+                  className="h-6 w-6 rounded-lg hover:bg-primary/10 haptic-btn"
+                  title="পরবর্তী ছবি"
+                >
+                  <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Campus Photo Gallery Modal ── */}
+      <Dialog open={showGalleryDialog} onOpenChange={setShowGalleryDialog}>
+        <DialogContent className="max-w-2xl bg-card/95 backdrop-blur-2xl border-border/50 p-4 sm:p-6 rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-bengali text-lg sm:text-xl flex items-center gap-2">
+              <div className="h-8 w-8 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                <ImageIcon className="h-4 w-4" />
+              </div>
+              <span>সাতক্ষীরা মেডিকেল কলেজ — ক্যাম্পাস ফটো গ্যালারি</span>
+            </DialogTitle>
+            <DialogDescription className="font-bengali text-xs">
+              আমাদের প্রিয় সাতক্ষীরা মেডিকেল কলেজ প্রাঙ্গণের কিছু দৃশ্য
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Main preview */}
+          <div className="relative rounded-2xl overflow-hidden aspect-video bg-black/40 ring-1 ring-border/40 shadow-inner group">
+            <img
+              src={smcPhotos[activePhotoIdx].src}
+              alt={smcPhotos[activePhotoIdx].title}
+              className="w-full h-full object-cover transition-all duration-500"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+              <p className="text-white font-bengali font-bold text-base sm:text-lg">
+                {smcPhotos[activePhotoIdx].title}
+              </p>
+              <p className="text-white/80 font-bengali text-xs">
+                {smcPhotos[activePhotoIdx].subtitle}
+              </p>
+            </div>
+
+            {/* Left/Right buttons */}
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setActivePhotoIdx(p => (p === 0 ? smcPhotos.length - 1 : p - 1))}
+              className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white hover:bg-black/80 border-0 opacity-80 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setActivePhotoIdx(p => (p === smcPhotos.length - 1 ? 0 : p + 1))}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white hover:bg-black/80 border-0 opacity-80 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Thumbnail list */}
+          <div className="grid grid-cols-5 gap-2 pt-2">
+            {smcPhotos.map((photo, idx) => (
+              <button
+                key={photo.src}
+                onClick={() => setActivePhotoIdx(idx)}
+                className={`relative rounded-xl overflow-hidden aspect-video transition-all duration-300 ring-2 ${
+                  activePhotoIdx === idx
+                    ? 'ring-primary scale-105 shadow-md shadow-primary/20'
+                    : 'ring-transparent opacity-60 hover:opacity-100'
+                }`}
+              >
+                <img src={photo.src} alt={photo.title} className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* 🔥 Big Cyberpunk Countdown: 9:00 PM - 10:00 PM */}
       {phase === 'countdown' && (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-destructive via-destructive/90 to-accent p-6 text-white timer-glow animate-scale-in border border-destructive/30 shadow-lg shadow-destructive/20">
