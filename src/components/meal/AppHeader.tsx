@@ -10,47 +10,26 @@ export default function AppHeader() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="border-b border-border/30 sticky top-0 z-50 relative overflow-hidden">
-      {/* College photo as very subtle header background */}
-      <div
-        className="absolute inset-0 smc-slide-1 opacity-[0.06] dark:opacity-[0.04]"
-        style={{
-          backgroundImage: 'url(/smc_1.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 30%',
-          filter: 'saturate(1.2)',
-        }}
-      />
-      <div className="absolute inset-0 glass-card rounded-none border-x-0 border-t-0" />
-
-      {/* Animated top border gradient */}
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-accent to-info bg-[length:200%_100%] animate-gradient-shift" />
-      
-      <div className="relative container mx-auto px-4 py-3 flex items-center justify-between max-w-7xl">
-        <div className="flex items-center gap-3 animate-fade-in-left">
-          {/* College building thumbnail */}
-          <div className="hidden sm:block relative w-10 h-10 rounded-xl overflow-hidden shadow-md ring-2 ring-primary/20 flex-shrink-0">
-            <img src="/smc_1.jpg" alt="SMC" className="w-full h-full object-cover object-top" />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent" />
-          </div>
-
-          <div className="relative group flex-shrink-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary to-info shadow-lg shadow-primary/25 transition-all duration-500 group-hover:shadow-xl group-hover:shadow-primary/40 group-hover:scale-110 group-hover:rotate-3 animate-rotate-3d neon-pulse" style={{ animationDuration: '12s' }}>
-              <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent animate-glow-pulse" />
-            <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-accent animate-pulse-ring" />
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 dark:bg-[#0B0F17]/85 border-b border-slate-200/80 dark:border-slate-800/80 transition-colors">
+      <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between max-w-6xl">
+        {/* Brand */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
+            <UtensilsCrossed className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-extrabold font-bengali leading-tight gradient-text-hero" style={{ backgroundSize: '200% auto' }}>সাতক্ষীরা মেডিকেল কলেজ</h1>
-            <p className="text-[10px] text-muted-foreground font-bengali flex items-center gap-1">
-              <Sparkles className="h-2.5 w-2.5 text-accent animate-glow-pulse" /> মিল ম্যানেজমেন্ট সিস্টেম
+            <h1 className="text-base sm:text-lg font-bold font-bengali tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
+              সাতক্ষীরা মেডিকেল কলেজ
+            </h1>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 font-bengali">
+              মিল ম্যানেজমেন্ট সিস্টেম
             </p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 sm:gap-3 animate-fade-in-right">
-          {/* Quick toggle for privileged users (Manager / Admin / Historical Manager) to switch views */}
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick toggle for privileged users */}
           {(isManager || isAdmin || isHistoricalManager) && (
             <Button
               variant="outline"
@@ -59,27 +38,27 @@ export default function AppHeader() {
                 playClickSound();
                 if (adminMode) disableAdminMode(); else enableAdminMode();
               }}
-              className={`font-bengali h-8 text-[11px] px-2.5 rounded-xl border border-primary/20 hover:scale-105 transition-all duration-300 flex items-center gap-1.5 shadow-sm haptic-btn ${
-                adminMode 
-                  ? 'bg-gradient-to-r from-primary/10 to-info/10 text-primary hover:bg-primary/25 border-primary/30' 
-                  : 'bg-gradient-to-r from-accent/10 to-warning/10 text-accent-foreground hover:bg-accent/25 border-accent/30'
+              className={`font-bengali h-8 text-xs px-3 rounded-lg border transition-all ${
+                adminMode
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                  : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
               }`}
             >
               {adminMode ? (
                 <>
-                  <GraduationCap className="h-3.5 w-3.5" />
-                  <span className="hidden xs:inline">ছাত্র ভিউ</span>
+                  <GraduationCap className="h-3.5 w-3.5 mr-1.5" />
+                  <span>ছাত্র ভিউ</span>
                 </>
               ) : (
                 <>
-                  <Settings className="h-3.5 w-3.5 animate-spin-slow" />
-                  <span className="hidden xs:inline">ম্যানেজার ভিউ</span>
+                  <Settings className="h-3.5 w-3.5 mr-1.5" />
+                  <span>ম্যানেজার ভিউ</span>
                 </>
               )}
             </Button>
           )}
 
-          {/* Light/Dark mode switcher */}
+          {/* Theme switcher */}
           <Button
             variant="ghost"
             size="icon"
@@ -87,31 +66,42 @@ export default function AppHeader() {
               playClickSound();
               setTheme(theme === 'dark' ? 'light' : 'dark');
             }}
-            className="h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:rotate-45 haptic-btn"
-            title="Theme Switcher"
+            className="h-8 w-8 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Theme"
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
 
-          {/* User profile info */}
-          <div className="hidden xs:flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-info/10 border border-primary/20 transition-all duration-300 hover:scale-110 hover:border-primary/40">
-              <User className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-bengali font-semibold leading-tight">{profile?.full_name}</span>
-              <div className="flex gap-1">
-                {isManager && <Badge variant="secondary" className="font-bengali text-[8px] px-1 py-0 h-3.5 bg-secondary/80 text-secondary-foreground border-0">ম্যানেজার</Badge>}
-                {isAdmin && <Badge className="font-bengali text-[8px] px-1 py-0 h-3.5 bg-gradient-to-r from-primary to-accent text-white border-0 shadow-sm shadow-primary/20">অ্যাডমিন</Badge>}
+          {/* Profile Name */}
+          {profile?.full_name && (
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                <User className="h-3.5 w-3.5" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-xs font-semibold font-bengali text-slate-800 dark:text-slate-200 leading-tight">
+                  {profile.full_name}
+                </span>
+                <div className="flex items-center gap-1">
+                  {isManager && <span className="text-[10px] text-emerald-600 font-medium">ম্যানেজার</span>}
+                  {isAdmin && <span className="text-[10px] text-purple-600 font-medium">অ্যাডমিন</span>}
+                </div>
               </div>
             </div>
-          </div>
-          
-          <Button variant="ghost" size="icon" onClick={() => {
-            playClickSound();
-            signOut();
-          }} className="h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all duration-500 hover:rotate-12 hover:scale-110 haptic-btn" title="Logout">
+          )}
+
+          {/* Logout */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              playClickSound();
+              signOut();
+            }}
+            className="h-8 w-8 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+            title="লগআউট"
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>

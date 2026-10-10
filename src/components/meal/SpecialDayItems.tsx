@@ -66,15 +66,15 @@ export default function SpecialDayItems() {
   if (items.length === 0) return null;
 
   return (
-    <Card className="card-hover card-shine overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-accent/10 to-transparent pb-3">
-        <CardTitle className="font-bengali flex items-center gap-2 text-lg">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15">
-            <Star className="h-4 w-4 text-accent" />
+    <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+      <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+        <CardTitle className="font-bengali flex items-center gap-2 text-base sm:text-lg text-slate-900 dark:text-slate-100">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+            <Star className="h-4 w-4" />
           </div>
-          ⭐ বিশেষ দিনের আইটেম
+          <span>বিশেষ দিনের আইটেম</span>
         </CardTitle>
-        <p className="text-xs text-muted-foreground font-bengali">আপনি চাইলে সুইচ চালু করুন</p>
+        <p className="text-xs text-slate-500 font-bengali">আপনি চাইলে সুইচ চালু করতে পারেন</p>
       </CardHeader>
       <CardContent className="space-y-2 pt-3">
         {items.map(item => (

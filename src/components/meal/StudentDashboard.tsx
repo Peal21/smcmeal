@@ -883,176 +883,102 @@ export default function StudentDashboard() {
   const selectedExtras = getSelectedExtras();
 
   return (
-    <div className="space-y-5 page-enter stagger-children">
-      {/* ══════ SMC STUDENT WELCOME HERO BANNER ══════ */}
-      <div className="relative overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-card/90 via-card/80 to-primary/10 backdrop-blur-xl shadow-xl shadow-primary/5 p-4 sm:p-6 transition-all duration-500 hover:shadow-2xl hover:border-primary/40 group">
-        {/* Background photo blend */}
-        <div
-          className="absolute inset-0 opacity-10 dark:opacity-15 bg-cover bg-center transition-transform duration-1000 group-hover:scale-105 pointer-events-none"
-          style={{ backgroundImage: `url(${smcPhotos[activePhotoIdx].src})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-card/95 via-card/85 to-transparent pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          {/* Left: Student info & greeting */}
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="relative flex-shrink-0">
-              <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary to-info text-white shadow-lg shadow-primary/30 ring-2 ring-primary/20 group-hover:scale-105 transition-all duration-300">
-                <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8" />
-              </div>
-              <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 ring-2 ring-background" />
-              </span>
+    <div className="space-y-6">
+      {/* ── Top Profile & Campus Banner ── */}
+      <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-sm transition-all">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Student Profile Info */}
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+              <GraduationCap className="h-6 w-6" />
             </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge className="font-bengali text-[10px] bg-primary/20 text-primary border-primary/30 gap-1">
-                  <Sparkles className="h-2.5 w-2.5" /> শিক্ষার্থী পোর্টাল
-                </Badge>
-                {profile?.room_number && (
-                  <Badge variant="outline" className="font-bengali text-[10px] border-border/60">
-                    রুম: {profile.room_number}
-                  </Badge>
-                )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                <span className="text-base sm:text-lg font-bold font-bengali text-slate-900 dark:text-slate-100">
+                  {profile?.full_name || 'শিক্ষার্থী'}
+                </span>
                 {profile?.roll_number && (
-                  <Badge variant="secondary" className="font-bengali text-[10px] bg-secondary/80 font-mono">
+                  <Badge variant="secondary" className="font-mono text-[11px] px-2 py-0 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                     রোল: {profile.roll_number}
                   </Badge>
                 )}
+                {profile?.room_number && (
+                  <Badge variant="outline" className="font-bengali text-[11px] px-2 py-0 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                    রুম {profile.room_number}
+                  </Badge>
+                )}
               </div>
-              <h2 className="text-lg sm:text-2xl font-extrabold font-bengali tracking-tight text-foreground flex items-center gap-2">
-                <span>{profile?.full_name || 'শিক্ষার্থী'}</span>
-              </h2>
-              <p className="text-xs text-muted-foreground font-bengali flex items-center gap-1.5">
-                <span>সাতক্ষীরা মেডিকেল কলেজ হোস্টেল</span>
-                <span>•</span>
-                <span className="text-primary font-medium">{format(new Date(), 'EEEE, dd MMMM yyyy')}</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bengali">
+                সাতক্ষীরা মেডিকেল কলেজ হোস্টেল • {format(new Date(), 'EEEE, dd MMMM yyyy')}
               </p>
             </div>
           </div>
 
-          {/* Right: SMC Campus Photo Strip & Preview */}
-          <div className="flex items-center gap-3 self-stretch md:self-auto justify-between sm:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-border/30">
-            {/* Active photo thumbnail card */}
-            <div
+          {/* SMC Campus Photo Gallery Trigger */}
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowGalleryDialog(true)}
-              className="relative h-16 sm:h-20 w-32 sm:w-44 rounded-2xl overflow-hidden cursor-pointer shadow-md group/photo ring-2 ring-primary/20 hover:ring-primary/50 transition-all duration-300 hover:scale-105 flex-shrink-0"
-              title="ক্যাম্পাস ফটো গ্যালারি দেখুন"
+              className="font-bengali h-9 text-xs px-3.5 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 gap-2 shadow-xs"
             >
-              <img
-                src={smcPhotos[activePhotoIdx].src}
-                alt={smcPhotos[activePhotoIdx].title}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover/photo:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-1.5">
-                <span className="text-white text-[10px] font-bengali font-bold truncate flex items-center gap-1">
-                  <Eye className="h-2.5 w-2.5 text-primary" /> {smcPhotos[activePhotoIdx].title}
-                </span>
-                <span className="text-white/70 text-[8px] font-bengali">ক্যাম্পাস ভিউ ({activePhotoIdx + 1}/5)</span>
+              <div className="w-5 h-5 rounded-md overflow-hidden flex-shrink-0">
+                <img src={smcPhotos[activePhotoIdx].src} alt="SMC" className="w-full h-full object-cover" />
               </div>
-            </div>
-
-            {/* Photo switcher controls */}
-            <div className="flex flex-col gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowGalleryDialog(true)}
-                className="h-8 text-xs font-bengali rounded-xl gap-1.5 border-primary/30 text-primary hover:bg-primary/10 haptic-btn"
-              >
-                <ImageIcon className="h-3.5 w-3.5" />
-                <span>৫টি ফটো</span>
-              </Button>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setActivePhotoIdx(p => (p === 0 ? smcPhotos.length - 1 : p - 1))}
-                  className="h-6 w-6 rounded-lg hover:bg-primary/10 haptic-btn"
-                  title="পূর্ববর্তী ছবি"
-                >
-                  <ChevronLeft className="h-3 w-3" />
-                </Button>
-                <span className="text-[10px] text-muted-foreground font-mono px-1">
-                  {activePhotoIdx + 1}/{smcPhotos.length}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setActivePhotoIdx(p => (p === smcPhotos.length - 1 ? 0 : p + 1))}
-                  className="h-6 w-6 rounded-lg hover:bg-primary/10 haptic-btn"
-                  title="পরবর্তী ছবি"
-                >
-                  <ChevronRight className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
+              <span>ক্যাম্পাস গ্যালারি (৫টি ছবি)</span>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* ── Campus Photo Gallery Modal ── */}
       <Dialog open={showGalleryDialog} onOpenChange={setShowGalleryDialog}>
-        <DialogContent className="max-w-2xl bg-card/95 backdrop-blur-2xl border-border/50 p-4 sm:p-6 rounded-3xl">
+        <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xl">
           <DialogHeader>
-            <DialogTitle className="font-bengali text-lg sm:text-xl flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-                <ImageIcon className="h-4 w-4" />
-              </div>
-              <span>সাতক্ষীরা মেডিকেল কলেজ — ক্যাম্পাস ফটো গ্যালারি</span>
+            <DialogTitle className="font-bengali text-base sm:text-lg text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <ImageIcon className="h-5 w-5 text-emerald-600" />
+              <span>সাতক্ষীরা মেডিকেল কলেজ — ক্যাম্পাস দৃশ্য</span>
             </DialogTitle>
-            <DialogDescription className="font-bengali text-xs">
-              আমাদের প্রিয় সাতক্ষীরা মেডিকেল কলেজ প্রাঙ্গণের কিছু দৃশ্য
+            <DialogDescription className="font-bengali text-xs text-slate-500">
+              {smcPhotos[activePhotoIdx].title} • {smcPhotos[activePhotoIdx].subtitle}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Main preview */}
-          <div className="relative rounded-2xl overflow-hidden aspect-video bg-black/40 ring-1 ring-border/40 shadow-inner group">
+          {/* Photo Frame */}
+          <div className="relative rounded-xl overflow-hidden aspect-video bg-slate-950 shadow-inner group">
             <img
               src={smcPhotos[activePhotoIdx].src}
               alt={smcPhotos[activePhotoIdx].title}
-              className="w-full h-full object-cover transition-all duration-500"
+              className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
-              <p className="text-white font-bengali font-bold text-base sm:text-lg">
-                {smcPhotos[activePhotoIdx].title}
-              </p>
-              <p className="text-white/80 font-bengali text-xs">
-                {smcPhotos[activePhotoIdx].subtitle}
-              </p>
-            </div>
-
-            {/* Left/Right buttons */}
             <Button
               variant="secondary"
               size="icon"
               onClick={() => setActivePhotoIdx(p => (p === 0 ? smcPhotos.length - 1 : p - 1))}
-              className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white hover:bg-black/80 border-0 opacity-80 group-hover:opacity-100 transition-opacity"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 text-white hover:bg-black/80 border-0"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="secondary"
               size="icon"
               onClick={() => setActivePhotoIdx(p => (p === smcPhotos.length - 1 ? 0 : p + 1))}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white hover:bg-black/80 border-0 opacity-80 group-hover:opacity-100 transition-opacity"
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/60 text-white hover:bg-black/80 border-0"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Thumbnail list */}
+          {/* Thumbnails */}
           <div className="grid grid-cols-5 gap-2 pt-2">
             {smcPhotos.map((photo, idx) => (
               <button
                 key={photo.src}
                 onClick={() => setActivePhotoIdx(idx)}
-                className={`relative rounded-xl overflow-hidden aspect-video transition-all duration-300 ring-2 ${
+                className={`relative rounded-lg overflow-hidden aspect-video transition-all border-2 ${
                   activePhotoIdx === idx
-                    ? 'ring-primary scale-105 shadow-md shadow-primary/20'
-                    : 'ring-transparent opacity-60 hover:opacity-100'
+                    ? 'border-emerald-600 shadow-sm'
+                    : 'border-transparent opacity-60 hover:opacity-100'
                 }`}
               >
                 <img src={photo.src} alt={photo.title} className="w-full h-full object-cover" />
@@ -1062,103 +988,88 @@ export default function StudentDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* 🔥 Big Cyberpunk Countdown: 9:00 PM - 10:00 PM */}
+      {/* ── Cutoff Countdown Banner (Clean & Non-distracting) ── */}
       {phase === 'countdown' && (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-destructive via-destructive/90 to-accent p-6 text-white timer-glow animate-scale-in border border-destructive/30 shadow-lg shadow-destructive/20">
-          <div className="absolute inset-0 bg-mesh opacity-20 pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%', animation: 'shimmer 2.5s ease-in-out infinite' }} />
-          <div className="relative z-10 flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 animate-pulse">
-              <Timer className="h-4 w-4" />
-              <span className="text-[11px] font-extrabold font-bengali tracking-widest uppercase">⚡ দুরুতো meal update দিন!</span>
-            </div>
-            <div className="text-5xl sm:text-6xl font-extrabold tabular-nums tracking-tight drop-shadow-lg neon-glow animate-pulse-ring" style={{ fontFamily: 'Outfit, Inter, sans-serif' }}>
-              {countdown.text}
-            </div>
-            <p className="text-xs font-bengali opacity-90 font-medium">{`${String(cutoffTime.hour).padStart(2, '0')}:${String(cutoffTime.minute).padStart(2, '0')}`} এর মধ্যে meal update শেষ করুন</p>
-            {/* Progress bar */}
-            <div className="w-full max-w-xs mt-1">
-              <div className="h-2 rounded-full bg-white/25 overflow-hidden shadow-inner border border-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-accent via-white to-white transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-                  style={{ width: `${countdown.progress}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] mt-1.5 opacity-80 font-bengali font-medium">
-                <span>{`${String(cutoffTime.hour - 1).padStart(2, '0')}:${String(cutoffTime.minute).padStart(2, '0')}`} PM</span>
-                <span>{`${String(cutoffTime.hour).padStart(2, '0')}:${String(cutoffTime.minute).padStart(2, '0')}`} PM</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Locked Alert: After 10:00 PM */}
-      {phase === 'locked' && (
-        <div className="rounded-2xl bg-gradient-to-r from-destructive/15 to-destructive/5 border border-destructive/30 p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-            </div>
+        <div className="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/20 p-4 text-rose-900 dark:text-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Timer className="h-5 w-5 text-rose-600 flex-shrink-0 animate-pulse" />
             <div>
-              <p className="font-bold font-bengali text-destructive">🔒 মিল আপডেট বন্ধ</p>
-              <p className="text-sm font-bengali text-muted-foreground">কাটঅফ টাইম পার হয়ে গেছে। পরিবর্তনের জন্য মিল ম্যানেজারকে বলুন।</p>
+              <p className="text-sm font-semibold font-bengali">
+                কাটঅফ সময় শেষ হতে বাকি: <span className="font-mono font-bold text-rose-700 dark:text-rose-300">{countdown.text}</span>
+              </p>
+              <p className="text-xs text-rose-600/80 dark:text-rose-400 font-bengali">
+                রাত {`${String(cutoffTime.hour).padStart(2, '0')}:${String(cutoffTime.minute).padStart(2, '0')}`} টার পূর্বে আপনার মিল আপডেট সম্পন্ন করুন।
+              </p>
             </div>
+          </div>
+          <div className="w-full sm:w-40 h-2 bg-rose-200 dark:bg-rose-900/50 rounded-full overflow-hidden self-center">
+            <div className="h-full bg-rose-600 rounded-full transition-all duration-1000" style={{ width: `${countdown.progress}%` }} />
           </div>
         </div>
       )}
 
-      {/* Tomorrow's Meal Card */}
-      <Card className={`overflow-hidden transition-all duration-500 border border-border/40 bg-card/70 backdrop-blur-md rounded-2xl shadow-xl shadow-primary/5 ${phase === 'countdown' ? 'border-destructive/40 ring-1 ring-destructive/20 shadow-destructive/10' : 'card-hover'}`}>
-        <CardHeader className="bg-gradient-to-r from-primary/5 via-info/5 to-transparent pb-4 border-b border-border/20">
+      {/* ── Locked Alert ── */}
+      {phase === 'locked' && (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60 p-4 flex items-center gap-3">
+          <ShieldAlert className="h-5 w-5 text-slate-500" />
+          <div>
+            <p className="text-sm font-semibold font-bengali text-slate-800 dark:text-slate-200">🔒 মিল আপডেট বন্ধ</p>
+            <p className="text-xs text-slate-500 font-bengali">কাটঅফ সময় পার হয়েছে। কোনো পরিবর্তনের প্রয়োজন হলে মিল ম্যানেজারের সাথে যোগাযোগ করুন।</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tomorrow's Meal Main Card ── */}
+      <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="font-bengali flex items-center gap-2.5 text-lg">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-primary/20 text-primary">
-                <Utensils className="h-4 w-4" />
-              </div>
+            <CardTitle className="font-bengali flex items-center gap-2.5 text-base sm:text-lg text-slate-900 dark:text-slate-100">
+              <Utensils className="h-5 w-5 text-emerald-600" />
               <span>আগামীকালের মিল — {format(addDays(new Date(), 1), 'dd MMMM yyyy')}</span>
             </CardTitle>
             {cutoff ? (
-              <Badge variant="destructive" className="font-bengali text-[10px] px-2 py-0.5 animate-pulse rounded-lg">কাটঅফ সম্পন্ন (লক)</Badge>
+              <Badge variant="destructive" className="font-bengali text-[11px] px-2.5 py-0.5 rounded-lg">কাটঅফ সম্পন্ন (লক)</Badge>
             ) : (
-              <Badge variant="outline" className="font-bengali text-[10px] px-2 py-0.5 border-primary/30 text-primary rounded-lg">কাটঅফ সময়: রাত {`${String(cutoffTime.hour).padStart(2, '0')}:${String(cutoffTime.minute).padStart(2, '0')}`}</Badge>
+              <Badge variant="outline" className="font-bengali text-[11px] px-2.5 py-0.5 border-emerald-300 text-emerald-700 dark:text-emerald-400 dark:border-emerald-800 rounded-lg">
+                কাটঅফ: রাত {`${String(cutoffTime.hour).padStart(2, '0')}:${String(cutoffTime.minute).padStart(2, '0')}`}
+              </Badge>
             )}
           </div>
         </CardHeader>
+
         <CardContent className="space-y-6 pt-5">
           {/* Extra Options Checklist */}
-          <div className="p-4 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 via-transparent to-transparent space-y-3">
-            <Label className="font-bengali font-semibold text-xs text-accent-foreground flex items-center gap-2">
-              🍳 Extra Option <span className="text-[10px] font-normal text-muted-foreground">(ঐচ্ছিক — প্রয়োজন অনুযায়ী বাছাই করুন)</span>
-            </Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="font-bengali font-semibold text-xs text-slate-800 dark:text-slate-200">
+                🍳 Extra Option <span className="text-[11px] font-normal text-slate-500">(ঐচ্ছিক — প্রয়োজন অনুযায়ী বাছাই করুন)</span>
+              </Label>
+              {selectedExtras.length > 0 && (
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium font-bengali">
+                  {selectedExtras.length}টি বাছাই করা হয়েছে
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {EXTRA_OPTIONS.map(o => (
                 <label 
                   key={o.value} 
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-all duration-300 ${
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
                     selectedExtras.includes(o.value)
-                      ? 'bg-accent/10 border-accent/40 text-accent-foreground shadow-sm shadow-accent/5'
-                      : 'bg-background/40 border-transparent hover:border-accent/20 hover:bg-accent/5 text-muted-foreground hover:text-foreground'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   <Checkbox
                     checked={selectedExtras.includes(o.value)}
                     onCheckedChange={(checked) => toggleExtra(o.value, !!checked)}
                     disabled={cutoff}
-                    className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
+                    className="rounded-md data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                   />
                   <span className="font-bengali leading-tight">{o.label}</span>
                 </label>
               ))}
             </div>
-            {selectedExtras.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-accent/10">
-                {selectedExtras.map(v => {
-                  const opt = EXTRA_OPTIONS.find(o => o.value === v);
-                  return <Badge key={v} className="font-bengali text-[10px] bg-accent/20 text-accent-foreground border-0 hover:bg-accent/30">{opt?.label}</Badge>;
-                })}
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1177,24 +1088,29 @@ export default function StudentDashboard() {
                   handleMealRowToggle('lunch');
                 }
               }}
-              className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-500 hover:scale-[1.02] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+              className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
                 todayMeal?.lunch 
-                  ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30 shadow-md shadow-primary/5' 
-                  : 'bg-card/50 border-border/50 opacity-80 hover:opacity-100'
+                  ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300/80 dark:border-emerald-800/80' 
+                  : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${todayMeal?.lunch ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${todayMeal?.lunch ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
                   <Sun className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-semibold font-bengali text-sm sm:text-base">লাঞ্চ (দুপুর)</p>
-                  <p className="text-[11px] text-muted-foreground font-bengali">দুপুরের খাবার</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold font-bengali text-sm sm:text-base text-slate-900 dark:text-slate-100">লাঞ্চ (দুপুর)</p>
+                    <Badge variant={todayMeal?.lunch ? 'default' : 'secondary'} className={`text-[10px] font-bengali py-0 px-1.5 ${todayMeal?.lunch ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                      {todayMeal?.lunch ? 'চালু' : 'বন্ধ'}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-bengali">দুপুরের খাবার</p>
                   {!todayMeal?.lunch && todayMeal?.lunch_off_today_only && (
-                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-accent/40 text-accent px-1.5 py-0 h-4">শুধু আগামীকালের জন্য বন্ধ</Badge>
+                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-amber-300 text-amber-700 dark:text-amber-400 px-1.5 py-0 h-4">শুধু আগামীকালের জন্য বন্ধ</Badge>
                   )}
                   {!todayMeal?.lunch && todayMeal && !todayMeal.lunch_off_today_only && (
-                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-destructive/40 text-destructive px-1.5 py-0 h-4">স্থায়ীভাবে বন্ধ</Badge>
+                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-rose-300 text-rose-700 dark:text-rose-400 px-1.5 py-0 h-4">স্থায়ীভাবে বন্ধ</Badge>
                   )}
                 </div>
               </div>
@@ -1202,7 +1118,7 @@ export default function StudentDashboard() {
                 checked={todayMeal?.lunch || false}
                 onCheckedChange={() => handleMealRowToggle('lunch')}
                 onClick={(e) => e.stopPropagation()}
-                className="relative z-10 data-[state=checked]:bg-primary"
+                className="relative z-10 data-[state=checked]:bg-emerald-600"
                 disabled={cutoff}
               />
             </div>
@@ -1222,24 +1138,29 @@ export default function StudentDashboard() {
                   handleMealRowToggle('dinner');
                 }
               }}
-              className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-500 hover:scale-[1.02] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+              className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
                 todayMeal?.dinner 
-                  ? 'bg-gradient-to-br from-info/10 via-info/5 to-transparent border-info/30 shadow-md shadow-info/5' 
-                  : 'bg-card/50 border-border/50 opacity-80 hover:opacity-100'
+                  ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300/80 dark:border-emerald-800/80' 
+                  : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${todayMeal?.dinner ? 'bg-info/20 text-info' : 'bg-muted text-muted-foreground'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${todayMeal?.dinner ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
                   <Moon className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-semibold font-bengali text-sm sm:text-base">ডিনার (রাত)</p>
-                  <p className="text-[11px] text-muted-foreground font-bengali">রাতের খাবার</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold font-bengali text-sm sm:text-base text-slate-900 dark:text-slate-100">ডিনার (রাত)</p>
+                    <Badge variant={todayMeal?.dinner ? 'default' : 'secondary'} className={`text-[10px] font-bengali py-0 px-1.5 ${todayMeal?.dinner ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                      {todayMeal?.dinner ? 'চালু' : 'বন্ধ'}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-bengali">রাতের খাবার</p>
                   {!todayMeal?.dinner && todayMeal?.dinner_off_today_only && (
-                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-info/40 text-info px-1.5 py-0 h-4">শুধু আগামীকালের জন্য বন্ধ</Badge>
+                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-amber-300 text-amber-700 dark:text-amber-400 px-1.5 py-0 h-4">শুধু আগামীকালের জন্য বন্ধ</Badge>
                   )}
                   {!todayMeal?.dinner && todayMeal && !todayMeal.dinner_off_today_only && (
-                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-destructive/40 text-destructive px-1.5 py-0 h-4">স্থায়ীভাবে বন্ধ</Badge>
+                    <Badge variant="outline" className="mt-1 text-[9px] font-bengali border-rose-300 text-rose-700 dark:text-rose-400 px-1.5 py-0 h-4">স্থায়ীভাবে বন্ধ</Badge>
                   )}
                 </div>
               </div>
@@ -1247,7 +1168,7 @@ export default function StudentDashboard() {
                 checked={todayMeal?.dinner || false}
                 onCheckedChange={() => handleMealRowToggle('dinner')}
                 onClick={(e) => e.stopPropagation()}
-                className="relative z-10 data-[state=checked]:bg-info"
+                className="relative z-10 data-[state=checked]:bg-emerald-600"
                 disabled={cutoff}
               />
             </div>
@@ -1302,15 +1223,15 @@ export default function StudentDashboard() {
       <SpecialDayItems />
 
       {/* Extra Meal Request */}
-      <Card className="card-hover card-shine overflow-hidden border border-border/40">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3">
-          <CardTitle className="font-bengali flex items-center gap-2 text-lg">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Plus className="h-4 w-4 text-primary" />
+      <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+          <CardTitle className="font-bengali flex items-center gap-2 text-base sm:text-lg text-slate-900 dark:text-slate-100">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+              <Plus className="h-4 w-4" />
             </div>
-            অতিরিক্ত মিল যোগ করুন
+            <span>অতিরিক্ত মিল যোগ করুন</span>
           </CardTitle>
-          <p className="text-xs text-muted-foreground font-bengali">Feast Day (সোম/শুক্র) তে ১ serving = ৩ মিল হিসেবে গণনা হবে।</p>
+          <p className="text-xs text-slate-500 font-bengali">Feast Day (সোম/শুক্র) তে ১ serving = ৩ মিল হিসেবে গণনা হবে।</p>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
           
@@ -1504,15 +1425,15 @@ export default function StudentDashboard() {
       </Card>
 
       {/* Vacation / Custom Off Date Range Card */}
-      <Card className="card-hover card-shine overflow-hidden border border-border/40">
-        <CardHeader className="bg-gradient-to-r from-warning/10 via-transparent to-transparent pb-3">
-          <CardTitle className="font-bengali flex items-center gap-2 text-lg">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/20">
-              <Clock className="h-4 w-4 text-warning" />
+      <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+          <CardTitle className="font-bengali flex items-center gap-2 text-base sm:text-lg text-slate-900 dark:text-slate-100">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+              <Clock className="h-4 w-4" />
             </div>
-            ছুটি / মিল অফ ডেট রেঞ্জ
+            <span>ছুটি / মিল অফ ডেট রেঞ্জ</span>
           </CardTitle>
-          <p className="text-xs text-muted-foreground font-bengali">নির্দিষ্ট ডেট রেঞ্জের মধ্যে আপনার মিল স্বয়ংক্রিয়ভাবে বন্ধ থাকবে।</p>
+          <p className="text-xs text-slate-500 font-bengali">নির্দিষ্ট ডেট রেঞ্জের মধ্যে আপনার মিল স্বয়ংক্রিয়ভাবে বন্ধ থাকবে।</p>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-3">
@@ -1573,38 +1494,38 @@ export default function StudentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+      {/* ── Stats Metric Cards (Clean & High Contrast) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
-          { icon: Utensils, value: monthStats.totalMeals, label: 'মোট মিল', bgCls: 'bg-primary/10 border-primary/20 text-primary', iconCls: 'text-primary', valueCls: 'text-primary' },
-          { icon: TrendingUp, value: `৳${monthStats.mealRate.toFixed(2)}`, label: 'মিল রেট', bgCls: 'bg-info/10 border-info/20 text-info', iconCls: 'text-info', valueCls: 'text-info' },
-          { icon: Wallet, value: `৳${Math.abs(monthStats.carryForward).toFixed(0)}`, label: monthStats.carryForward > 0 ? 'আগের বকেয়া' : monthStats.carryForward < 0 ? 'আগের অতিরিক্ত' : 'আগের ব্যালেন্স', bgCls: monthStats.carryForward > 0 ? 'bg-destructive/10 border-destructive/20 text-destructive' : 'bg-primary/10 border-primary/20 text-primary', iconCls: monthStats.carryForward > 0 ? 'text-destructive' : 'text-primary', valueCls: monthStats.carryForward > 0 ? 'text-destructive' : 'text-primary' },
-          { icon: Wallet, value: `৳${monthStats.totalPaid}`, label: 'জমা দিয়েছি', bgCls: 'bg-primary/10 border-primary/20 text-primary', iconCls: 'text-primary', valueCls: 'text-primary' },
-          { icon: Wallet, value: `৳${Math.abs(monthStats.totalDue).toFixed(0)}`, label: monthStats.totalDue > 0 ? 'বকেয়া' : 'পাবে', bgCls: monthStats.totalDue > 0 ? 'bg-destructive/10 border-destructive/20 text-destructive' : 'bg-primary/10 border-primary/20 text-primary', iconCls: monthStats.totalDue > 0 ? 'text-destructive' : 'text-primary', valueCls: monthStats.totalDue > 0 ? 'text-destructive' : 'text-primary' },
+          { icon: Utensils, value: monthStats.totalMeals, label: 'মোট মিল', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/50' },
+          { icon: TrendingUp, value: `৳${monthStats.mealRate.toFixed(2)}`, label: 'মিল রেট', color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-950/50' },
+          { icon: Wallet, value: `৳${Math.abs(monthStats.carryForward).toFixed(0)}`, label: monthStats.carryForward > 0 ? 'আগের বকেয়া' : monthStats.carryForward < 0 ? 'আগের অতিরিক্ত' : 'আগের ব্যালেন্স', color: monthStats.carryForward > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300', bg: monthStats.carryForward > 0 ? 'bg-rose-50 dark:bg-rose-950/50' : 'bg-slate-100 dark:bg-slate-800/50' },
+          { icon: Wallet, value: `৳${monthStats.totalPaid}`, label: 'জমা দিয়েছি', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/50' },
+          { icon: Wallet, value: `৳${Math.abs(monthStats.totalDue).toFixed(0)}`, label: monthStats.totalDue > 0 ? 'বর্তমান বকেয়া' : 'পাবে', color: monthStats.totalDue > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400', bg: monthStats.totalDue > 0 ? 'bg-rose-50 dark:bg-rose-950/50' : 'bg-emerald-50 dark:bg-emerald-950/50' },
         ].map((stat, i) => (
-          <Card key={i} className="card-hover card-shine border border-border/40 bg-card/60 backdrop-blur-md overflow-hidden group rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
-            <CardContent className="pt-6 pb-5 text-center flex flex-col items-center justify-center">
-              <div className={`mb-3 flex h-11 w-11 items-center justify-center rounded-xl border transition-all duration-500 group-hover:scale-110 group-hover:shadow-md ${stat.bgCls}`}>
-                <stat.icon className={`h-5 w-5 ${stat.iconCls} transition-transform duration-300 group-hover:scale-110`} />
+          <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium font-bengali text-slate-500 dark:text-slate-400">{stat.label}</span>
+              <div className={`h-7 w-7 rounded-lg ${stat.bg} flex items-center justify-center ${stat.color}`}>
+                <stat.icon className="h-3.5 w-3.5" />
               </div>
-              <p className={`text-xl sm:text-2xl font-extrabold stat-number ${stat.valueCls}`} style={{ animationDelay: `${i * 0.08}s` }}>{stat.value}</p>
-              <p className="text-[11px] text-muted-foreground font-bengali mt-2 font-medium">{stat.label}</p>
-            </CardContent>
-          </Card>
+            </div>
+            <p className={`text-xl sm:text-2xl font-bold font-mono tracking-tight ${stat.color}`}>{stat.value}</p>
+          </div>
         ))}
       </div>
 
       {/* Meal History */}
-      <Card className="card-hover card-shine overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent">
+      <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
           <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => { setShowHistory(!showHistory); if (!showHistory) fetchHistory(); }}>
-            <CardTitle className="font-bengali flex items-center gap-2 text-lg">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <History className="h-4 w-4 text-primary" />
+            <CardTitle className="font-bengali flex items-center gap-2 text-base sm:text-lg text-slate-900 dark:text-slate-100">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <History className="h-4 w-4" />
               </div>
-              মিল হিস্ট্রি
+              <span>মিল হিস্ট্রি</span>
             </CardTitle>
-            <Badge variant="outline" className="font-bengali text-xs">{showHistory ? 'বন্ধ করুন' : 'দেখুন'}</Badge>
+            <Badge variant="outline" className="font-bengali text-xs border-slate-200 dark:border-slate-700">{showHistory ? 'বন্ধ করুন' : 'দেখুন'}</Badge>
           </div>
           {showHistory && allMonths.length > 0 && (
             <div className="mt-3" onClick={(e) => e.stopPropagation()}>
